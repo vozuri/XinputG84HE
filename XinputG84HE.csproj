@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <AssemblyName>XinputG84HE</AssemblyName>
+    <RootNamespace>XinputG84HE</RootNamespace>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fluent Design / Mica backdrop / modern Windows 11 controls, no MSIX required -->
+    <PackageReference Include="WPF-UI" Version="3.0.5" />
+    <!-- System tray icon + context menu -->
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.1.3" />
+    <!-- Lightweight MVVM (ObservableObject, RelayCommand) -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <!-- Virtual Xbox 360 controller -->
+    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+  </ItemGroup>
+
+</Project>
