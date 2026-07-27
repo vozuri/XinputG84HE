@@ -2,7 +2,7 @@
 
 A lightweight, open-source Windows utility designed specifically for the EPOMAKER G84HE. This software maps your keyboard and HID inputs to virtual XInput gamepad commands, allowing you to use your keyboard as a controller. 
 
-*Note: This project was 99% vibecoded by Claude Sonnet 5.*
+*Note: This project was 99% vibecoded by Claude Sonnet 5 and Gemini 3.6 Flash.*
 
 ### The Wooting 80HE Killer
 
@@ -20,6 +20,8 @@ In my opinion, the only **main** feature advantage the Wooting 80HE held over th
 * Deadzone customization.
 * Force analog override command if the keyboard isn't sending data correctly.
 * Live key actuation status (shows ghost inputs being nullified).
+* Custom response curves for joysticks with editor
+* Choose between square and circle deadzone
 
 ---
 
