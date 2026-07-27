@@ -46,8 +46,8 @@ public sealed class HidDeviceService
     // stuck sensor/report rather than a genuine sustained press, and ignore
     // it until it changes. Configurable/toggleable from the UI ("Anti Ghost
     // Input").
-    public bool AntiGhostEnabled { get; set; } = true;
-    public double AntiGhostSeconds { get; set; } = 10.0;
+    public bool AntiGhostEnabled { get; set; } = false;
+    public double AntiGhostSeconds { get; set; } = 2.5;
 
     /// <summary>Raised whenever the "any device connected" state changes.</summary>
     public event Action<bool>? ConnectionChanged;

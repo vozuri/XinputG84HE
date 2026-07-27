@@ -52,14 +52,22 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double deadzonePercent = 5;
     [ObservableProperty] private double digitalThresholdPercent = 50;
     [ObservableProperty] private bool blockMappedKeys = true;
-    [ObservableProperty] private bool antiGhostInputEnabled = true;
-    [ObservableProperty] private double antiGhostInputSeconds = 10;
+    [ObservableProperty] private bool useRadialDeadzone = false;
+    [ObservableProperty] private bool antiGhostInputEnabled = false;
+    [ObservableProperty] private double antiGhostInputSeconds = 2.5;
+    [ObservableProperty] private int emulationReportRate = 500;
     [ObservableProperty] private bool isCapturingHotkey;
+
+    public int[] AvailableReportRates { get; } = new[] { 125, 250, 500, 1000, 2000, 4000, 8000 };
     [ObservableProperty] private bool isAnalogHelpVisible;
+    [ObservableProperty] private bool isCurveEditorVisible;
+    [ObservableProperty] private int curveEditorJoystick; // 0 = Left, 1 = Right
+    [ObservableProperty] private string curveEditorTitle = "Response Curve Editor";
+    public ObservableCollection<CurvePointViewModel> CurvePoints { get; } = new();
     [ObservableProperty] private bool isHotkeysExpanded;
-    [ObservableProperty] private string toggleHotkeyText = "Ctrl+Alt+G";
-    [ObservableProperty] private string nextPresetHotkeyText = "Ctrl+Alt+]";
-    [ObservableProperty] private string prevPresetHotkeyText = "Ctrl+Alt+[";
+    [ObservableProperty] private string toggleHotkeyText = "Unbound";
+    [ObservableProperty] private string nextPresetHotkeyText = "Unbound";
+    [ObservableProperty] private string prevPresetHotkeyText = "Unbound";
 
     // ---- Live input view ----
     [ObservableProperty] private double leftStickDotX;
@@ -120,17 +128,22 @@ public partial class MainViewModel : ObservableObject
         _profile = _profileStore.LoadLastOrDefault();
         ApplyProfileToUiState();
 
-        LoadHotkeyOrDefault(HotkeyToggle, KeyboardHookService.ModControl | KeyboardHookService.ModAlt, 0x47, d => ToggleHotkeyText = d);
-        LoadHotkeyOrDefault(HotkeyNext, KeyboardHookService.ModControl | KeyboardHookService.ModAlt, 0xDD, d => NextPresetHotkeyText = d);
-        LoadHotkeyOrDefault(HotkeyPrev, KeyboardHookService.ModControl | KeyboardHookService.ModAlt, 0xDB, d => PrevPresetHotkeyText = d);
+        LoadHotkeyOrDefault(HotkeyToggle, 0, 0, d => ToggleHotkeyText = d);
+        LoadHotkeyOrDefault(HotkeyNext, 0, 0, d => NextPresetHotkeyText = d);
+        LoadHotkeyOrDefault(HotkeyPrev, 0, 0, d => PrevPresetHotkeyText = d);
 
         (bool ghostEnabled, double ghostSeconds) = _profileStore.LoadAntiGhostSettings();
+        int reportRate = _profileStore.LoadReportRate();
+        
         _suppressTuningSave = true;
         AntiGhostInputEnabled = ghostEnabled;
         AntiGhostInputSeconds = ghostSeconds;
+        EmulationReportRate = reportRate;
         _suppressTuningSave = false;
+        
         _hid.AntiGhostEnabled = ghostEnabled;
         _hid.AntiGhostSeconds = ghostSeconds;
+        _gamepad.SetReportRate(reportRate);
 
         RefreshPresetTiles();
         RefreshAllLabels();
@@ -151,8 +164,16 @@ public partial class MainViewModel : ObservableObject
     private void LoadHotkeyOrDefault(string name, int defaultModifiers, int defaultVk, Action<string> setText)
     {
         (int modifiers, int vk) combo = _profileStore.LoadHotkey(name) ?? (defaultModifiers, defaultVk);
-        _hook.SetHotkey(name, combo.modifiers, combo.vk);
-        setText(KeyboardHookService.DescribeCombo(combo.modifiers, combo.vk));
+        if (combo.vk == 0)
+        {
+            _hook.SetHotkey(name, 0, 0);
+            setText("Unbound");
+        }
+        else
+        {
+            _hook.SetHotkey(name, combo.modifiers, combo.vk);
+            setText(KeyboardHookService.DescribeCombo(combo.modifiers, combo.vk));
+        }
     }
 
     private void OnHotkeyPressed(string name)
@@ -247,8 +268,87 @@ public partial class MainViewModel : ObservableObject
         LoadPreset(PresetTiles[nextIndex].Name);
     }
 
+    public event Action? OnCurveEditorRedrawNeeded;
+
     [RelayCommand]
     private void ToggleAnalogHelp() => IsAnalogHelpVisible = !IsAnalogHelpVisible;
+
+    [RelayCommand]
+    private void OpenCurveEditor(string joystickStr)
+    {
+        int joystick = int.TryParse(joystickStr, out int j) ? j : 0;
+        SelectJoystick(joystickStr);
+        IsCurveEditorVisible = true;
+    }
+
+    [RelayCommand]
+    private void SelectJoystick(string joystickStr)
+    {
+        int joystick = int.TryParse(joystickStr, out int j) ? j : 0;
+        CurveEditorJoystick = joystick;
+        CurveEditorTitle = joystick == 0 ? "Left Stick Response Curve" : "Right Stick Response Curve";
+        
+        _suppressTuningSave = true;
+        CurvePoints.Clear();
+        
+        double[] curve = joystick == 0 ? _profile.LeftStickCurve : _profile.RightStickCurve;
+        for (int i = 0; i < 11; i++)
+        {
+            var point = new CurvePointViewModel(i * 10, curve[i]);
+            point.YChanged += (_, _) => OnCurvePointChanged();
+            CurvePoints.Add(point);
+        }
+        _suppressTuningSave = false;
+
+        OnCurveEditorRedrawNeeded?.Invoke();
+    }
+
+    [RelayCommand]
+    private void ApplyLinearCurve() => SetCurveValues(new double[] { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 });
+
+    [RelayCommand]
+    private void ApplySCurve() => SetCurveValues(new double[] { 0, 3, 8, 18, 32, 50, 68, 82, 92, 97, 100 });
+
+    [RelayCommand]
+    private void ApplyAggressiveCurve() => SetCurveValues(new double[] { 0, 25, 45, 60, 72, 82, 90, 95, 98, 99, 100 });
+
+    [RelayCommand]
+    private void ApplySmoothCurve() => SetCurveValues(new double[] { 0, 1, 3, 8, 15, 28, 45, 65, 82, 94, 100 });
+
+    [RelayCommand]
+    private void ResetCurve() => ApplyLinearCurve();
+
+    private void SetCurveValues(double[] values)
+    {
+        if (values == null || values.Length != 11 || CurvePoints.Count != 11) return;
+        _suppressTuningSave = true;
+        for (int i = 0; i < 11; i++)
+        {
+            CurvePoints[i].Y = values[i];
+        }
+        _suppressTuningSave = false;
+        OnCurvePointChanged();
+    }
+
+    [RelayCommand]
+    private void CloseCurveEditor() => IsCurveEditorVisible = false;
+
+    private void OnCurvePointChanged()
+    {
+        if (_suppressTuningSave) return;
+
+        double[] curve = CurveEditorJoystick == 0 ? _profile.LeftStickCurve : _profile.RightStickCurve;
+        for (int i = 0; i < 11; i++)
+        {
+            if (i < CurvePoints.Count)
+            {
+                curve[i] = CurvePoints[i].Y;
+            }
+        }
+
+        _profileStore.Save(_profile);
+        OnCurveEditorRedrawNeeded?.Invoke();
+    }
 
     [RelayCommand]
     private void SetToggleHotkey() => BeginCaptureHotkey(HotkeyToggle, d => ToggleHotkeyText = d);
@@ -364,6 +464,7 @@ public partial class MainViewModel : ObservableObject
             Deadzone = _profile.Deadzone,
             DigitalThreshold = _profile.DigitalThreshold,
             BlockMappedKeys = _profile.BlockMappedKeys,
+            UseRadialDeadzone = _profile.UseRadialDeadzone,
         };
         _profileStore.Save(fresh);
         RefreshPresetTiles();
@@ -425,6 +526,23 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    partial void OnUseRadialDeadzoneChanged(bool value)
+    {
+        if (_suppressTuningSave)
+        {
+            return;
+        }
+        if (_profile.Locked)
+        {
+            _suppressTuningSave = true;
+            UseRadialDeadzone = _profile.UseRadialDeadzone;
+            _suppressTuningSave = false;
+            return;
+        }
+        _profile.UseRadialDeadzone = value;
+        _profileStore.Save(_profile);
+    }
+
     partial void OnAntiGhostInputEnabledChanged(bool value)
     {
         if (_suppressTuningSave)
@@ -443,6 +561,16 @@ public partial class MainViewModel : ObservableObject
         }
         _hid.AntiGhostSeconds = value;
         _profileStore.SaveAntiGhostSettings(AntiGhostInputEnabled, value);
+    }
+
+    partial void OnEmulationReportRateChanged(int value)
+    {
+        if (_suppressTuningSave)
+        {
+            return;
+        }
+        _gamepad.SetReportRate(value);
+        _profileStore.SaveReportRate(value);
     }
 
     // ---- Preset tile callbacks ----
@@ -553,6 +681,7 @@ public partial class MainViewModel : ObservableObject
         DeadzonePercent = _profile.Deadzone * 100.0;
         DigitalThresholdPercent = _profile.DigitalThreshold * 100.0;
         BlockMappedKeys = _profile.BlockMappedKeys;
+        UseRadialDeadzone = _profile.UseRadialDeadzone;
         _suppressTuningSave = false;
     }
 
@@ -657,10 +786,28 @@ public partial class MainViewModel : ObservableObject
         // the checkbox can never get out of sync with actual hook behavior.
         _hook.BlockingEnabled = IsEmulationRunning && _profile.BlockMappedKeys && !_pendingStop;
 
-        double leftX = SignedAxis(ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
-        double leftY = SignedAxis(ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
-        double rightX = SignedAxis(ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
-        double rightY = SignedAxis(ControllerInput.RightStickUp, ControllerInput.RightStickDown);
+        double leftX, leftY;
+        double rightX, rightY;
+
+        if (_profile.UseRadialDeadzone)
+        {
+            leftX = RawSignedAxis(ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
+            leftY = RawSignedAxis(ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
+            ApplyCircularMapping(ref leftX, ref leftY);
+            ApplyRadialDeadzone(ref leftX, ref leftY, _profile.Deadzone);
+
+            rightX = RawSignedAxis(ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
+            rightY = RawSignedAxis(ControllerInput.RightStickUp, ControllerInput.RightStickDown);
+            ApplyCircularMapping(ref rightX, ref rightY);
+            ApplyRadialDeadzone(ref rightX, ref rightY, _profile.Deadzone);
+        }
+        else
+        {
+            leftX = SignedAxis(ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
+            leftY = SignedAxis(ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
+            rightX = SignedAxis(ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
+            rightY = SignedAxis(ControllerInput.RightStickUp, ControllerInput.RightStickDown);
+        }
 
         LeftStickDotX = LeftStickCenterX - StickDotHalfSize + (leftX * StickDotTravel);
         LeftStickDotY = LeftStickCenterY - StickDotHalfSize - (leftY * StickDotTravel);
@@ -817,6 +964,46 @@ public partial class MainViewModel : ObservableObject
             return 0.0;
         }
         return (normalized - _profile.Deadzone) / (1.0 - _profile.Deadzone);
+    }
+
+    private double RawSignedAxis(ControllerInput positive, ControllerInput negative)
+    {
+        double pos = RawValue(positive);
+        double neg = RawValue(negative);
+        return Math.Clamp(pos - neg, -1.0, 1.0);
+    }
+
+    private double RawValue(ControllerInput input)
+    {
+        ushort? keyId = _profile.GetRawKeyId(input);
+        return keyId.HasValue ? _hid.GetNormalized(keyId.Value) : 0.0;
+    }
+
+    private static void ApplyRadialDeadzone(ref double x, ref double y, double deadzone)
+    {
+        if (deadzone <= 0.0) return;
+        
+        double length = Math.Sqrt(x * x + y * y);
+        if (length <= deadzone)
+        {
+            x = 0.0;
+            y = 0.0;
+            return;
+        }
+
+        double rescaledLength = (length - deadzone) / (1.0 - deadzone);
+        rescaledLength = Math.Min(rescaledLength, 1.0);
+
+        x = (x / length) * rescaledLength;
+        y = (y / length) * rescaledLength;
+    }
+
+    private static void ApplyCircularMapping(ref double x, ref double y)
+    {
+        double mappedX = x * Math.Sqrt(1.0 - (y * y) / 2.0);
+        double mappedY = y * Math.Sqrt(1.0 - (x * x) / 2.0);
+        x = mappedX;
+        y = mappedY;
     }
 
     public void Shutdown()

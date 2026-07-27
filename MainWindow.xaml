@@ -6,33 +6,34 @@
         xmlns:conv="clr-namespace:XinputG84HE.Converters"
         xmlns:models="clr-namespace:XinputG84HE.Models"
         Title="EPOMAKER G84HE Xbox Emulation"
-        Height="900" Width="1600" MinHeight="700" MinWidth="1000"
+        Height="1080" Width="1600" MinHeight="840" MinWidth="1000"
         WindowBackdropType="Mica"
         ExtendsContentIntoTitleBar="True"
         Closing="OnWindowClosing">
 
     <ui:FluentWindow.Resources>
         <conv:BoolToTextConverter x:Key="ConnectedText" TrueText="G84HE Connected" FalseText="G84HE Disconnected" />
-        <conv:BoolToTextConverter x:Key="EmuText" TrueText="Emulation On" FalseText="Emulation Off" />
-        <conv:BoolToBrushConverter x:Key="DotBrush" TrueBrush="#4CAF7D" FalseBrush="#C0392B" />
-        <conv:BoolToBrushConverter x:Key="SwitchBrush" TrueBrush="#3300C896" FalseBrush="#33C0392B" />
+        <conv:BoolToTextConverter x:Key="EmuText" TrueText="Emulation Active" FalseText="Start Emulation" />
+        <conv:BoolToBrushConverter x:Key="DotBrush" TrueBrush="#00C896" FalseBrush="#E74C3C" />
+        <conv:BoolToBrushConverter x:Key="SwitchBrush" TrueBrush="#00C896" FalseBrush="#2A303C" />
         <conv:PercentFormatConverter x:Key="PercentFormat" />
         <conv:BoolToVisibilityConverter x:Key="BindingVisibility" />
         <conv:BoolToVisibilityConverter x:Key="InvertedVisibility" Invert="True" />
-        <conv:PressedInputsToBrushConverter x:Key="PressedBrush" PressedBrush="#00C896" IdleBrush="#22FFFFFF" />
-        <conv:LabelToBoundBrushConverter x:Key="AnalogBoundBrush" UnboundBrush="#332B1414" BoundBrush="#2200C896" />
+        <conv:PressedInputsToBrushConverter x:Key="PressedBrush" PressedBrush="#00C896" IdleBrush="#1AFFFFFF" />
+        <conv:LabelToBoundBrushConverter x:Key="AnalogBoundBrush" UnboundBrush="#221A1D24" BoundBrush="#2500C896" />
         <conv:LabelToVisibilityConverter x:Key="LabelVisibility" />
-        <conv:BoundPressedMultiConverter x:Key="DigitalBrush" UnboundBrush="#332B1414" BoundIdleBrush="#2200C896" PressedBrush="#00C896" />
+        <conv:BoundPressedMultiConverter x:Key="DigitalBrush" UnboundBrush="#221A1D24" BoundIdleBrush="#2500C896" PressedBrush="#00C896" />
         <conv:ZeroCountToVisibilityConverter x:Key="ZeroCountVisibility" />
 
+        <!-- Hotspot Style for Controller Buttons -->
         <Style x:Key="HotspotStyle" TargetType="ui:Button">
-            <Setter Property="Background" Value="#22FFFFFF" />
+            <Setter Property="Background" Value="#1F2430" />
             <Setter Property="BorderBrush" Value="#33FFFFFF" />
             <Setter Property="BorderThickness" Value="1.2" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ui:Button">
@@ -45,6 +46,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="#00C896" />
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -54,33 +56,42 @@
 
         <Style x:Key="HotspotGlyph" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
         <Style x:Key="HotspotLabel" TargetType="TextBlock">
             <Setter Property="FontSize" Value="9" />
-            <Setter Property="Opacity" Value="0.8" />
+            <Setter Property="Foreground" Value="#00C896" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             <Setter Property="MaxWidth" Value="64" />
         </Style>
 
+        <!-- Modern Toggle Switch -->
         <Style x:Key="SwitchStyle" TargetType="ToggleButton">
-            <Setter Property="Width" Value="46" />
-            <Setter Property="Height" Value="24" />
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="22" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Track" CornerRadius="12" Background="{TemplateBinding Background}" BorderBrush="#33FFFFFF" BorderThickness="1">
+                        <Border x:Name="Track" CornerRadius="11" Background="{TemplateBinding Background}" BorderBrush="#33FFFFFF" BorderThickness="1">
                             <Grid>
-                                <Ellipse x:Name="Knob" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" Margin="3,0,0,0" />
+                                <Ellipse x:Name="Knob" Width="16" Height="16" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0" />
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
+                                <Setter TargetName="Track" Property="Background" Value="#00C896" />
+                                <Setter TargetName="Track" Property="BorderBrush" Value="#00C896" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -89,13 +100,13 @@
         </Style>
 
         <Style x:Key="IconActionButton" TargetType="Button">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="32" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Background" Value="#22FFFFFF" />
-            <Setter Property="BorderBrush" Value="#33FFFFFF" />
+            <Setter Property="Background" Value="#1AFFFFFF" />
+            <Setter Property="BorderBrush" Value="#2AFFFFFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Template">
@@ -109,6 +120,46 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#00C896" />
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Frosted Glass Card Panel -->
+        <Style x:Key="GlassPanel" TargetType="Border">
+            <Setter Property="Background" Value="#121620" />
+            <Setter Property="BorderBrush" Value="#22FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+
+        <!-- Glass Secondary Button -->
+        <Style x:Key="GlassButton" TargetType="Button">
+            <Setter Property="Background" Value="#1AFFFFFF" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="#2AFFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="#00C896" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -125,47 +176,53 @@
         </Grid.ColumnDefinitions>
 
         <!-- ===================== Sidebar ===================== -->
-        <Border Grid.Column="0" Background="#14000000" Padding="20,44,20,20">
+        <Border Grid.Column="0" Background="#0D111A" BorderBrush="#22FFFFFF" BorderThickness="0,0,1,0" Padding="18,36,18,20">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <Grid Margin="0,0,0,20">
+                    <Grid Margin="0,0,0,18">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="EPOMAKER G84HE" FontSize="19" FontWeight="Bold" />
-                            <TextBlock Text="Xbox Emulation" FontSize="13" Opacity="0.65" />
+                            <TextBlock Text="EPOMAKER G84HE" FontSize="18" FontWeight="Bold" Foreground="White" />
+                            <TextBlock Text="Xbox Emulation" FontSize="12" Foreground="#00C896" FontWeight="SemiBold" />
                         </StackPanel>
                         <Button Grid.Column="1" Content="Exit" Click="OnExitClick" VerticalAlignment="Top"
-                                Padding="10,5" FontSize="11" Background="#33C0392B" Foreground="White" BorderThickness="0" />
+                                Style="{StaticResource GlassButton}" Padding="10,4" Foreground="#FF6B6B" />
                     </Grid>
 
                     <!-- Connection status -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <Ellipse Width="10" Height="10" Fill="{Binding IsKeyboardConnected, Converter={StaticResource DotBrush}}" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding IsKeyboardConnected, Converter={StaticResource ConnectedText}}" Margin="8,0,0,0" FontSize="12" VerticalAlignment="Center" />
-                        <Button Content="?" Command="{Binding ToggleAnalogHelpCommand}" Padding="7,0" Margin="8,0,0,0" FontSize="11" FontWeight="Bold" />
-                    </StackPanel>
-                    <StackPanel Margin="0,4,0,12" Visibility="{Binding IsAnalogHelpVisible, Converter={StaticResource BindingVisibility}}">
-                        <Button Content="Force Analog Input" Command="{Binding InitializeAnalogModeCommand}" Padding="0,8" HorizontalContentAlignment="Center" Margin="0,0,0,4" />
-                        <TextBlock Text="Runs automatically on startup and when emulation turns on - use this if the keyboard ever comes up silent." FontSize="10" Opacity="0.55" TextWrapping="Wrap" />
-                    </StackPanel>
+                    <Border Style="{StaticResource GlassPanel}" Padding="10" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Ellipse Width="8" Height="8" Fill="{Binding IsKeyboardConnected, Converter={StaticResource DotBrush}}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding IsKeyboardConnected, Converter={StaticResource ConnectedText}}" Margin="8,0,0,0" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Button Content="?" Command="{Binding ToggleAnalogHelpCommand}" HorizontalAlignment="Right" Padding="6,1" FontSize="11" FontWeight="Bold" Style="{StaticResource GlassButton}" />
+                            </Grid>
+                            <StackPanel Margin="0,8,0,0" Visibility="{Binding IsAnalogHelpVisible, Converter={StaticResource BindingVisibility}}">
+                                <Button Content="Force Analog Input" Command="{Binding InitializeAnalogModeCommand}" Style="{StaticResource GlassButton}" Padding="0,6" HorizontalContentAlignment="Center" Margin="0,0,0,6" Foreground="#00C896" />
+                                <TextBlock Text="Runs automatically on startup and when emulation turns on - use this if the keyboard ever comes up silent." FontSize="10" Opacity="0.6" TextWrapping="Wrap" Foreground="White" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Emulation toggle -->
-                    <Button Command="{Binding ToggleEmulationCommand}" Height="52" Margin="0,0,0,4">
+                    <Button Command="{Binding ToggleEmulationCommand}" Height="48" Margin="0,0,0,4" Cursor="Hand">
                         <Button.Style>
                             <Style TargetType="Button">
-                                <Setter Property="Background" Value="#2A2D3A" />
+                                <Setter Property="Background" Value="#1AFFFFFF" />
                                 <Setter Property="Foreground" Value="White" />
-                                <Setter Property="BorderThickness" Value="0" />
-                                <Setter Property="Cursor" Value="Hand" />
-                                <Setter Property="FontSize" Value="15" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter Property="BorderBrush" Value="#2AFFFFFF" />
+                                <Setter Property="BorderThickness" Value="1" />
+                                <Setter Property="FontSize" Value="14" />
+                                <Setter Property="FontWeight" Value="Bold" />
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" CornerRadius="10">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
                                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
                                         </ControlTemplate>
@@ -175,28 +232,30 @@
                                     <DataTrigger Binding="{Binding IsEmulationRunning}" Value="True">
                                         <Setter Property="Background" Value="#00C896" />
                                         <Setter Property="Foreground" Value="#0B0F0D" />
+                                        <Setter Property="BorderThickness" Value="0" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding IsPendingStop}" Value="True">
                                         <Setter Property="Background" Value="#D9A441" />
                                         <Setter Property="Foreground" Value="#0B0F0D" />
+                                        <Setter Property="BorderThickness" Value="0" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                         <TextBlock Text="{Binding IsEmulationRunning, Converter={StaticResource EmuText}}" />
                     </Button>
-                    <TextBlock Text="Waiting for held keys to release..." FontSize="10" Opacity="0.6" Margin="0,0,0,14"
+                    <TextBlock Text="Waiting for held keys to release..." FontSize="10" Foreground="#D9A441" Margin="0,2,0,12" HorizontalAlignment="Center"
                                Visibility="{Binding IsPendingStop, Converter={StaticResource BindingVisibility}}" />
 
-                    <!-- Presets -->
-                    <Grid Margin="0,0,0,8">
+                    <!-- Presets Header -->
+                    <Grid Margin="0,8,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="PRESETS" FontSize="10" Opacity="0.55" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="0" Text="PRESETS" FontSize="10" FontWeight="Bold" Foreground="#00C896" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Content="+" Style="{StaticResource IconActionButton}" ToolTip="New preset" Command="{Binding NewPresetCommand}" Margin="0,0,6,0" FontWeight="Bold" FontSize="18" />
+                            <Button Content="+" Style="{StaticResource IconActionButton}" ToolTip="New preset" Command="{Binding NewPresetCommand}" Margin="0,0,6,0" FontWeight="Bold" FontSize="16" />
                             <Button Content="&#128190;" Style="{StaticResource IconActionButton}" ToolTip="Save preset" Command="{Binding SavePresetCommand}" />
                         </StackPanel>
                     </Grid>
@@ -209,17 +268,17 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Width="126" Height="70" Margin="0,0,8,8" CornerRadius="10" Padding="8"
+                                <Border Width="128" Height="68" Margin="0,0,8,8" CornerRadius="10" Padding="8"
                                         MouseLeftButtonUp="OnPresetTileClick"
-                                        MouseRightButtonUp="OnPresetTileRightClick">
+                                        MouseRightButtonUp="OnPresetTileRightClick" Cursor="Hand">
                                     <Border.Style>
                                         <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#1AFFFFFF" />
+                                            <Setter Property="Background" Value="#121620" />
                                             <Setter Property="BorderBrush" Value="#22FFFFFF" />
                                             <Setter Property="BorderThickness" Value="1" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="Background" Value="#2A00C896" />
+                                                    <Setter Property="Background" Value="#2500C896" />
                                                     <Setter Property="BorderBrush" Value="#00C896" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -232,23 +291,23 @@
                                         </Grid.RowDefinitions>
 
                                         <Grid Grid.Row="0">
-                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="White"
                                                        TextWrapping="Wrap" VerticalAlignment="Top"
                                                        Visibility="{Binding IsEditingName, Converter={StaticResource InvertedVisibility}}" />
                                             <TextBox Text="{Binding EditBuffer, UpdateSourceTrigger=PropertyChanged}"
-                                                     FontSize="12" VerticalAlignment="Top"
+                                                     FontSize="12" VerticalAlignment="Top" Foreground="White" Background="#1AFFFFFF" BorderBrush="#00C896"
                                                      KeyDown="OnPresetRenameKeyDown"
                                                      LostFocus="OnPresetRenameLostFocus"
                                                      Visibility="{Binding IsEditingName, Converter={StaticResource BindingVisibility}}" />
                                         </Grid>
 
                                         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Button Content="&#9998;" ToolTip="Rename" Command="{Binding BeginRenameCommand}"
-                                                    FontSize="11" Padding="5,2" Margin="0,0,4,0" />
+                                            <Button Content="&#9998;" ToolTip="Rename" Command="{Binding BeginRenameCommand}" Style="{StaticResource GlassButton}"
+                                                    FontSize="10" Padding="4,1" Margin="0,0,3,0" />
                                             <Button ToolTip="Lock/unlock" Command="{Binding ToggleLockCommand}"
-                                                    FontSize="11" Padding="5,2" Margin="0,0,4,0">
+                                                    FontSize="10" Padding="4,1" Margin="0,0,3,0">
                                                 <Button.Style>
-                                                    <Style TargetType="Button">
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GlassButton}">
                                                         <Setter Property="Content" Value="&#128275;" />
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsLocked}" Value="True">
@@ -258,8 +317,8 @@
                                                     </Style>
                                                 </Button.Style>
                                             </Button>
-                                            <Button Content="&#10005;" ToolTip="Delete" Command="{Binding DeleteCommand}"
-                                                    FontSize="11" Padding="5,2" />
+                                            <Button Content="&#10005;" ToolTip="Delete" Command="{Binding DeleteCommand}" Style="{StaticResource GlassButton}"
+                                                    FontSize="10" Padding="4,1" Foreground="#FF6B6B" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -268,99 +327,182 @@
                     </ItemsControl>
 
                     <!-- Tuning -->
-                    <TextBlock Text="ANALOG DEADZONE" FontSize="10" Opacity="0.55" Margin="0,0,0,4" />
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="40" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Minimum="0" Maximum="30" Value="{Binding DeadzonePercent}" />
-                        <TextBlock Grid.Column="1" Text="{Binding DeadzonePercent, Converter={StaticResource PercentFormat}}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="11" />
-                    </Grid>
-
-                    <TextBlock Text="DIGITAL DEADZONE" FontSize="10" Opacity="0.55" Margin="0,0,0,4" />
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="40" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Minimum="10" Maximum="90" Value="{Binding DigitalThresholdPercent}" />
-                        <TextBlock Grid.Column="1" Text="{Binding DigitalThresholdPercent, Converter={StaticResource PercentFormat}}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="11" />
-                    </Grid>
-
-                    <!-- Switches -->
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Block mapped keys while active" VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap" />
-                        <ToggleButton Grid.Column="1" Style="{StaticResource SwitchStyle}" IsChecked="{Binding BlockMappedKeys}"
-                                      Click="OnBlockMappedKeysClick"
-                                      Background="{Binding BlockMappedKeys, Converter={StaticResource SwitchBrush}}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                    </Grid>
-
-                    <Border Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,16">
+                    <Border Style="{StaticResource GlassPanel}" Margin="0,0,0,14">
                         <StackPanel>
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="ANALOG DEADZONE" FontSize="10" FontWeight="Bold" Foreground="#00C896" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding DeadzonePercent, Converter={StaticResource PercentFormat}}" HorizontalAlignment="Right" FontSize="11" FontWeight="Bold" Foreground="White" />
+                            </Grid>
+                            <Slider Minimum="0" Maximum="30" Value="{Binding DeadzonePercent}" Margin="0,0,0,10" />
+
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="DIGITAL DEADZONE" FontSize="10" FontWeight="Bold" Foreground="#00C896" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding DigitalThresholdPercent, Converter={StaticResource PercentFormat}}" HorizontalAlignment="Right" FontSize="11" FontWeight="Bold" Foreground="White" />
+                            </Grid>
+                            <Slider Minimum="10" Maximum="90" Value="{Binding DigitalThresholdPercent}" Margin="0,0,0,10" />
+
+                            <Grid Margin="0,2,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Block mapped keys while active" VerticalAlignment="Center" FontSize="11" Foreground="White" TextWrapping="Wrap" />
+                                <ToggleButton Grid.Column="1" Style="{StaticResource SwitchStyle}" IsChecked="{Binding BlockMappedKeys}"
+                                              Click="OnBlockMappedKeysClick" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Deadzone Shape -->
+                    <TextBlock Text="DEADZONE SHAPE" FontSize="10" FontWeight="Bold" Foreground="#00C896" Margin="0,0,0,6" />
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" CornerRadius="10" Padding="10,8" MouseLeftButtonUp="OnSquareDeadzoneClick" Cursor="Hand">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#121620" />
+                                    <Setter Property="BorderBrush" Value="#22FFFFFF" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding UseRadialDeadzone}" Value="False">
+                                            <Setter Property="Background" Value="#2500C896" />
+                                            <Setter Property="BorderBrush" Value="#00C896" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Square" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" />
+                                <TextBlock Text="Default" FontSize="9" Opacity="0.6" Foreground="White" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" CornerRadius="10" Padding="10,8" MouseLeftButtonUp="OnCircleDeadzoneClick" Cursor="Hand">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#121620" />
+                                    <Setter Property="BorderBrush" Value="#22FFFFFF" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding UseRadialDeadzone}" Value="True">
+                                            <Setter Property="Background" Value="#2500C896" />
+                                            <Setter Property="BorderBrush" Value="#00C896" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Circle" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" />
+                                <TextBlock Text="Experimental" FontSize="9" Opacity="0.6" Foreground="White" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Response Curve Editor Trigger Button -->
+                    <TextBlock Text="RESPONSE CURVE" FontSize="10" FontWeight="Bold" Foreground="#00C896" Margin="0,0,0,6" />
+                    <Button Content="Open Curve Editor" 
+                            Command="{Binding OpenCurveEditorCommand}" CommandParameter="0"
+                            Height="40" HorizontalAlignment="Stretch" Margin="0,0,0,14"
+                            Background="#00C896" Foreground="#0B0F0D" FontSize="12" FontWeight="Bold" Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#00E6AD" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <Border Style="{StaticResource GlassPanel}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Anti Ghost Input" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="White" />
+                                <ToggleButton Grid.Column="1" Style="{StaticResource SwitchStyle}" IsChecked="{Binding AntiGhostInputEnabled}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                            <TextBlock Text="Ignores stuck key values held too long." FontSize="10" Opacity="0.6" Foreground="White" TextWrapping="Wrap" Margin="0,0,0,6" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                </Grid.ColumnDefinitions>
+                                <Slider Minimum="0" Maximum="10" Value="{Binding AntiGhostInputSeconds}" IsEnabled="{Binding AntiGhostInputEnabled}" />
+                                <TextBlock Grid.Column="1" Text="{Binding AntiGhostInputSeconds, StringFormat={}{0:0.0}s}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassPanel}" Margin="0,0,0,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Report Rate" FontSize="11" FontWeight="SemiBold" Foreground="White" />
+                                <TextBlock Text="Polling rate of virtual Xbox controller" FontSize="10" Opacity="0.6" Foreground="White" TextWrapping="Wrap" Margin="0,1,0,0" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableReportRates}" SelectedItem="{Binding EmulationReportRate}" Width="90" VerticalAlignment="Center" Background="#1AFFFFFF" Foreground="White">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding StringFormat={}{0} Hz}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- Hotkeys -->
+                    <Expander Header="Hotkey Configuration" IsExpanded="{Binding IsHotkeysExpanded}" Margin="0,0,0,14" Foreground="White">
+                        <StackPanel Margin="0,8,0,0">
                             <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Anti Ghost Input" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" />
-                                <ToggleButton Grid.Column="1" Style="{StaticResource SwitchStyle}" IsChecked="{Binding AntiGhostInputEnabled}"
-                                              Background="{Binding AntiGhostInputEnabled, Converter={StaticResource SwitchBrush}}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" Foreground="White">
+                                    <Run Text="Toggle: " /><Run Text="{Binding ToggleHotkeyText}" FontWeight="Bold" Foreground="#00C896" />
+                                </TextBlock>
+                                <Button Grid.Column="1" Content="Change" Command="{Binding SetToggleHotkeyCommand}" Style="{StaticResource GlassButton}" Padding="6,2" FontSize="10" />
                             </Grid>
-                            <TextBlock Text="Ignores a key stuck reporting the same non-max value for too long." FontSize="10" Opacity="0.55" TextWrapping="Wrap" Margin="0,0,0,6" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="40" />
-                                </Grid.ColumnDefinitions>
-                                <Slider Minimum="0" Maximum="10" Value="{Binding AntiGhostInputSeconds}" IsEnabled="{Binding AntiGhostInputEnabled}" />
-                                <TextBlock Grid.Column="1" Text="{Binding AntiGhostInputSeconds, StringFormat={}{0:0.0}s}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="11" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Hotkeys -->
-                    <Expander Header="Hotkey Configuration" IsExpanded="{Binding IsHotkeysExpanded}" Margin="0,0,0,16">
-                        <StackPanel Margin="0,10,0,0">
-                            <Grid Margin="0,0,0,8">
+                            <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="11" Opacity="0.8">
-                                    <Run Text="Toggle emulation: " /><Run Text="{Binding ToggleHotkeyText}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" Foreground="White">
+                                    <Run Text="Next: " /><Run Text="{Binding NextPresetHotkeyText}" FontWeight="Bold" Foreground="#00C896" />
                                 </TextBlock>
-                                <Button Grid.Column="1" Content="Change" Command="{Binding SetToggleHotkeyCommand}" Padding="8,3" FontSize="11" />
-                            </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="11" Opacity="0.8">
-                                    <Run Text="Next preset: " /><Run Text="{Binding NextPresetHotkeyText}" FontWeight="SemiBold" />
-                                </TextBlock>
-                                <Button Grid.Column="1" Content="Change" Command="{Binding SetNextPresetHotkeyCommand}" Padding="8,3" FontSize="11" />
+                                <Button Grid.Column="1" Content="Change" Command="{Binding SetNextPresetHotkeyCommand}" Style="{StaticResource GlassButton}" Padding="6,2" FontSize="10" />
                             </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="11" Opacity="0.8">
-                                    <Run Text="Previous preset: " /><Run Text="{Binding PrevPresetHotkeyText}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" Foreground="White">
+                                    <Run Text="Prev: " /><Run Text="{Binding PrevPresetHotkeyText}" FontWeight="Bold" Foreground="#00C896" />
                                 </TextBlock>
-                                <Button Grid.Column="1" Content="Change" Command="{Binding SetPrevPresetHotkeyCommand}" Padding="8,3" FontSize="11" />
+                                <Button Grid.Column="1" Content="Change" Command="{Binding SetPrevPresetHotkeyCommand}" Style="{StaticResource GlassButton}" Padding="6,2" FontSize="10" />
                             </Grid>
                         </StackPanel>
                     </Expander>
 
                     <!-- Live key actuation -->
-                    <TextBlock Text="LIVE KEY ACTUATION" FontSize="10" Opacity="0.55" Margin="0,0,0,6" />
+                    <TextBlock Text="LIVE KEY ACTUATION" FontSize="10" FontWeight="Bold" Foreground="#00C896" Margin="0,0,0,6" />
                     <ItemsControl ItemsSource="{Binding ActiveKeyRows}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -369,26 +511,26 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="0,0,0,6" Padding="8,6" CornerRadius="8" Background="#22FFFFFF">
+                                <Border Margin="0,0,0,5" Padding="8,5" CornerRadius="6" Background="#121620" BorderBrush="#22FFFFFF" BorderThickness="1">
                                     <StackPanel>
                                         <Grid>
-                                            <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" />
-                                            <TextBlock Text="{Binding Percent, StringFormat={}{0:0}%}" FontSize="10" Opacity="0.7" HorizontalAlignment="Right" />
+                                            <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Left" />
+                                            <TextBlock Text="{Binding Percent, StringFormat={}{0:0}%}" FontSize="10" Foreground="#00C896" FontWeight="Bold" HorizontalAlignment="Right" />
                                         </Grid>
-                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Percent, Mode=OneWay}" Height="6" Margin="0,4,0,0" />
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Percent, Mode=OneWay}" Height="5" Margin="0,3,0,0" Foreground="#00C896" Background="#1AFFFFFF" />
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="(no keys currently active)" FontSize="11" Opacity="0.5"
+                    <TextBlock Text="(no keys currently active)" FontSize="10" Opacity="0.5" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,0"
                                Visibility="{Binding ActiveKeyRows.Count, Converter={StaticResource ZeroCountVisibility}}" />
                 </StackPanel>
             </ScrollViewer>
         </Border>
 
         <!-- ===================== Main content ===================== -->
-        <Grid Grid.Column="1">
+        <Grid Grid.Column="1" Background="#0B0F0D">
             <Grid.RowDefinitions>
                 <RowDefinition Height="44" />
                 <RowDefinition Height="Auto" />
@@ -397,14 +539,14 @@
 
             <ui:TitleBar Grid.Row="0" Title="EPOMAKER G84HE Xbox Emulation" ShowMaximize="True" ShowMinimize="True" />
 
-            <Border Grid.Row="1" Margin="24,10,24,0" Padding="14,10" CornerRadius="10" Background="#1E00C896"
+            <Border Grid.Row="1" Margin="24,10,24,0" Padding="14,10" CornerRadius="10" Background="#2500C896" BorderBrush="#00C896" BorderThickness="1"
                     Visibility="{Binding IsBinding, Converter={StaticResource BindingVisibility}}">
-                <TextBlock Text="{Binding BindingStatusText}" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding BindingStatusText}" FontSize="13" FontWeight="SemiBold" Foreground="White" />
             </Border>
 
-            <Border Grid.Row="1" Margin="24,10,24,0" Padding="14,10" CornerRadius="10" Background="#1E3B82F6"
+            <Border Grid.Row="1" Margin="24,10,24,0" Padding="14,10" CornerRadius="10" Background="#253B82F6" BorderBrush="#3B82F6" BorderThickness="1"
                     Visibility="{Binding IsCapturingHotkey, Converter={StaticResource BindingVisibility}}">
-                <TextBlock Text="Press the key combo you want to use..." FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="Press the key combo you want to use..." FontSize="13" FontWeight="SemiBold" Foreground="White" />
             </Border>
 
             <Viewbox Grid.Row="2" Stretch="Uniform" Margin="24,10">
@@ -412,13 +554,13 @@
 
                     <!-- Body backdrop -->
                     <Border Canvas.Left="20" Canvas.Top="90" Width="740" Height="400" CornerRadius="75"
-                            Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1" />
+                            Background="#0E121C" BorderBrush="#2AFFFFFF" BorderThickness="1.5" />
 
                     <!-- Trigger/bumper grouping boxes -->
                     <Border Canvas.Left="94" Canvas.Top="0" Width="102" Height="78" CornerRadius="20"
-                            Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1" />
+                            Background="#0E121C" BorderBrush="#2AFFFFFF" BorderThickness="1.5" />
                     <Border Canvas.Left="584" Canvas.Top="0" Width="102" Height="78" CornerRadius="20"
-                            Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1" />
+                            Background="#0E121C" BorderBrush="#2AFFFFFF" BorderThickness="1.5" />
 
                     <!-- Triggers -->
                     <ui:Button Style="{StaticResource HotspotStyle}" Width="90" Height="28" Canvas.Left="100" Canvas.Top="4"
@@ -676,15 +818,218 @@
                 </Canvas>
             </Viewbox>
 
-            <TextBlock Grid.Row="2" Text="App Version 1.9 - Designed By Claude Sonnet 5"
+            <TextBlock Grid.Row="2" Text="App Version 1.11 - Designed by Claude Sonnet 5 and Gemini 3.6 Flash"
                        FontSize="11" Opacity="0.4"
                        HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8"
                        IsHitTestVisible="False" />
         </Grid>
 
+        <!-- ===================== Curve Editor Overlay ===================== -->
+        <Grid Grid.ColumnSpan="2" Background="#D80B0F0D" Visibility="{Binding IsCurveEditorVisible, Converter={StaticResource BindingVisibility}}" Panel.ZIndex="100">
+            <Border Background="#14171E" BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="16" 
+                    Width="760" Height="580" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Row 0: Header & Joystick Selector -->
+                    <Grid Grid.Row="0" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding CurveEditorTitle}" FontSize="20" FontWeight="Bold" Foreground="White" />
+                            <TextBlock Text="Drag control points on graph or enter exact values below to modify response." FontSize="11" Opacity="0.6" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <!-- Joystick Selector Tabs -->
+                        <Border Grid.Column="1" Background="#1AFFFFFF" CornerRadius="8" Padding="3" VerticalAlignment="Center" Margin="16,0,16,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Left Stick" Padding="12,6" FontSize="12" FontWeight="SemiBold"
+                                        Command="{Binding SelectJoystickCommand}" CommandParameter="0">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="Foreground" Value="White" />
+                                            <Setter Property="BorderThickness" Value="0" />
+                                            <Setter Property="Cursor" Value="Hand" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurveEditorJoystick}" Value="0">
+                                                    <Setter Property="Background" Value="#00C896" />
+                                                    <Setter Property="Foreground" Value="#0B0F0D" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button Content="Right Stick" Padding="12,6" FontSize="12" FontWeight="SemiBold"
+                                        Command="{Binding SelectJoystickCommand}" CommandParameter="1">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="Foreground" Value="White" />
+                                            <Setter Property="BorderThickness" Value="0" />
+                                            <Setter Property="Cursor" Value="Hand" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurveEditorJoystick}" Value="1">
+                                                    <Setter Property="Background" Value="#00C896" />
+                                                    <Setter Property="Foreground" Value="#0B0F0D" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Close Button -->
+                        <Button Grid.Column="2" Content="&#10005;" Command="{Binding CloseCurveEditorCommand}"
+                                Width="32" Height="32" FontSize="14" Foreground="White" Background="#22FFFFFF"
+                                BorderThickness="0" Cursor="Hand" VerticalAlignment="Center">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="16">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
+
+                    <!-- Row 1: Preset Actions -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                        <StackPanel.Resources>
+                            <Style x:Key="PresetButtonStyle" TargetType="Button">
+                                <Setter Property="Background" Value="#22FFFFFF" />
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Padding" Value="10,5" />
+                                <Setter Property="FontSize" Value="11" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="Margin" Value="0,0,6,0" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </StackPanel.Resources>
+                        <TextBlock Text="Presets:" FontSize="12" Opacity="0.6" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <Button Content="Linear (1:1)" Command="{Binding ApplyLinearCurveCommand}" Style="{StaticResource PresetButtonStyle}" />
+                        <Button Content="S-Curve (Soft)" Command="{Binding ApplySCurveCommand}" Style="{StaticResource PresetButtonStyle}" />
+                        <Button Content="Aggressive" Command="{Binding ApplyAggressiveCurveCommand}" Style="{StaticResource PresetButtonStyle}" />
+                        <Button Content="Smooth / Delay" Command="{Binding ApplySmoothCurveCommand}" Style="{StaticResource PresetButtonStyle}" />
+                        <Button Content="Reset Default" Command="{Binding ResetCurveCommand}" Style="{StaticResource PresetButtonStyle}" Margin="0" />
+                    </StackPanel>
+
+                    <!-- Row 2: Graph Canvas -->
+                    <Border Grid.Row="2" Background="#0C0F17" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,14">
+                        <Canvas x:Name="GraphCanvas" Background="Transparent" ClipToBounds="True"
+                                MouseDown="OnGraphCanvasMouseDown"
+                                MouseMove="OnGraphCanvasMouseMove"
+                                MouseUp="OnGraphCanvasMouseUp"
+                                MouseLeave="OnGraphCanvasMouseLeave"
+                                SizeChanged="OnGraphCanvasSizeChanged"
+                                Cursor="Cross" />
+                    </Border>
+
+                    <!-- Row 3: Exact Values Table -->
+                    <Border Grid.Row="3" Background="#0C0F17" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,16">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                                <TextBlock Text="Exact Values Table (Virtual Output %)" FontSize="11" FontWeight="SemiBold" Foreground="#00C896" />
+                                <TextBlock Text="Physical Actuation Input %" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding CurvePoints}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="11" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="2,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Text="{Binding X, StringFormat={}{0}%}" FontSize="10" Opacity="0.6" HorizontalAlignment="Center" Margin="0,0,0,2" />
+                                            <Border Grid.Row="1" Background="#1AFFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="4">
+                                                <TextBox Text="{Binding Y, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:0}}" 
+                                                         FontSize="11" FontWeight="SemiBold" TextAlignment="Center" Padding="2,3"
+                                                         Background="Transparent" Foreground="White" BorderThickness="0" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Row 4: Footer Actions -->
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Done" Command="{Binding CloseCurveEditorCommand}" 
+                                Background="#00C896" Foreground="#0B0F0D" FontWeight="Bold" FontSize="13" Padding="28,8" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#00E6AD" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
         <!-- ===================== Tray icon ===================== -->
         <tb:TaskbarIcon x:Name="TrayIcon"
-                         IconSource="/Assets/icon.ico"
                          ToolTipText="EPOMAKER G84HE Xbox Emulation"
                          MenuActivation="LeftOrRightClick"
                          TrayLeftMouseUp="OnTrayLeftClick">

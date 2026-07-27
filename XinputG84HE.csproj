@@ -10,11 +10,9 @@
     <SelfContained>false</SelfContained>
     <AssemblyName>XinputG84HE</AssemblyName>
     <RootNamespace>XinputG84HE</RootNamespace>
-    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\icon.ico" />
   </ItemGroup>
 
   <ItemGroup>

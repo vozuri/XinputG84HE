@@ -9,7 +9,7 @@ namespace XinputG84HE.Services;
 /// <summary>
 /// Reads current key actuation from <see cref="HidDeviceService"/>, applies
 /// the active profile's bindings/deadzone/threshold, and pushes the result to
-/// a virtual Xbox 360 controller via ViGEmBus at ~125Hz.
+/// a virtual Xbox 360 controller via ViGEmBus.
 /// </summary>
 public sealed class GamepadOutputService : IDisposable
 {
@@ -37,6 +37,7 @@ public sealed class GamepadOutputService : IDisposable
     private IXbox360Controller? _controller;
     private CancellationTokenSource? _cts;
     private volatile Profile? _profile;
+    private volatile int _reportRate = 500;
 
     public event Action<string>? Log;
 
@@ -45,6 +46,11 @@ public sealed class GamepadOutputService : IDisposable
     public GamepadOutputService(HidDeviceService hid)
     {
         _hid = hid;
+    }
+
+    public void SetReportRate(int hz)
+    {
+        _reportRate = hz;
     }
 
     /// <summary>Swaps the active profile live, even while emulation is running.</summary>
@@ -141,7 +147,19 @@ public sealed class GamepadOutputService : IDisposable
     {
         while (!token.IsCancellationRequested)
         {
-            Thread.Sleep(8); // ~125Hz
+            int hz = _reportRate;
+            if (hz <= 0) hz = 500;
+
+            if (hz <= 1000)
+            {
+                int delayMs = 1000 / hz;
+                if (delayMs < 1) delayMs = 1;
+                Thread.Sleep(delayMs);
+            }
+            else
+            {
+                Thread.Sleep(0);
+            }
 
             Profile? profile = _profile;
             IXbox360Controller? controller = _controller;
@@ -159,10 +177,29 @@ public sealed class GamepadOutputService : IDisposable
                     controller.SetButtonState(button, pressed);
                 }
 
-                double leftX = SignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
-                double leftY = SignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
-                double rightX = SignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
-                double rightY = SignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown);
+                double leftX, leftY;
+                double rightX, rightY;
+
+                if (profile.UseRadialDeadzone)
+                {
+                    leftX = RawSignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
+                    leftY = RawSignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
+                    ApplyCircularMapping(ref leftX, ref leftY);
+                    ApplyRadialDeadzone(ref leftX, ref leftY, profile.Deadzone, profile.LeftStickCurve);
+
+                    rightX = RawSignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
+                    rightY = RawSignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown);
+                    ApplyCircularMapping(ref rightX, ref rightY);
+                    ApplyRadialDeadzone(ref rightX, ref rightY, profile.Deadzone, profile.RightStickCurve);
+                }
+                else
+                {
+                    leftX = SignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft, profile.LeftStickCurve);
+                    leftY = SignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown, profile.LeftStickCurve);
+                    
+                    rightX = SignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft, profile.RightStickCurve);
+                    rightY = SignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown, profile.RightStickCurve);
+                }
 
                 controller.SetAxisValue(Xbox360Axis.LeftThumbX, ToAxisShort(leftX));
                 controller.SetAxisValue(Xbox360Axis.LeftThumbY, ToAxisShort(leftY));
@@ -179,11 +216,83 @@ public sealed class GamepadOutputService : IDisposable
         }
     }
 
-    private double SignedAxis(Profile profile, ControllerInput positive, ControllerInput negative)
+    private double SignedAxis(Profile profile, ControllerInput positive, ControllerInput negative, double[] curve)
     {
         double pos = DeadzonedValue(profile, positive);
         double neg = DeadzonedValue(profile, negative);
+        if (curve != null)
+        {
+            pos = EvaluateCurve(curve, pos);
+            neg = EvaluateCurve(curve, neg);
+        }
         return Math.Clamp(pos - neg, -1.0, 1.0);
+    }
+
+    private double RawSignedAxis(Profile profile, ControllerInput positive, ControllerInput negative)
+    {
+        double pos = RawValue(profile, positive);
+        double neg = RawValue(profile, negative);
+        return Math.Clamp(pos - neg, -1.0, 1.0);
+    }
+
+    private double RawValue(Profile profile, ControllerInput input)
+    {
+        ushort? keyId = profile.GetRawKeyId(input);
+        return keyId.HasValue ? _hid.GetNormalized(keyId.Value) : 0.0;
+    }
+
+    /// <summary>
+    /// Applies a radial deadzone to the 2D vector, rescaling the remaining travel to 0..1
+    /// </summary>
+    private static void ApplyRadialDeadzone(ref double x, ref double y, double deadzone, double[] curve)
+    {
+        double length = Math.Sqrt(x * x + y * y);
+        if (length <= deadzone)
+        {
+            x = 0.0;
+            y = 0.0;
+            return;
+        }
+
+        double rescaledLength = (length - deadzone) / (1.0 - deadzone);
+        rescaledLength = Math.Min(rescaledLength, 1.0);
+
+        if (curve != null)
+        {
+            rescaledLength = EvaluateCurve(curve, rescaledLength);
+        }
+
+        x = (x / length) * rescaledLength;
+        y = (y / length) * rescaledLength;
+    }
+
+    private static double EvaluateCurve(double[] curve, double x)
+    {
+        if (curve == null || curve.Length != 11) return x;
+        if (x <= 0) return curve[0] / 100.0;
+        if (x >= 1.0) return curve[10] / 100.0;
+
+        double scaledX = x * 10.0;
+        int index = (int)scaledX;
+        double fraction = scaledX - index;
+
+        if (index >= 10) return curve[10] / 100.0;
+
+        double y1 = curve[index];
+        double y2 = curve[index + 1];
+        return (y1 + (y2 - y1) * fraction) / 100.0;
+    }
+
+    /// <summary>
+    /// Maps a square input vector to a circular one using elliptical grid mapping.
+    /// This prevents diagonal inputs from exceeding a magnitude of 1.0.
+    /// </summary>
+    private static void ApplyCircularMapping(ref double x, ref double y)
+    {
+        double mappedX = x * Math.Sqrt(1.0 - (y * y) / 2.0);
+        double mappedY = y * Math.Sqrt(1.0 - (x * x) / 2.0);
+        x = mappedX;
+        y = mappedY;
     }
 
     /// <summary>0..1 actuation for an analog input, with deadzone applied and rescaled so full press still reaches 1.0.</summary>

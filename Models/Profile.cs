@@ -29,8 +29,17 @@ public sealed class Profile
     /// <summary>Whether mapped keys are swallowed system-wide while this profile is active and emulation is on.</summary>
     public bool BlockMappedKeys { get; set; } = true;
 
+    /// <summary>When true, use radial/circular deadzone for joysticks rather than axial (square). False by default.</summary>
+    public bool UseRadialDeadzone { get; set; } = false;
+
     /// <summary>When true, this preset's bindings and tuning can't be changed until unlocked.</summary>
     public bool Locked { get; set; }
+
+    /// <summary>11 points defining the response curve (0-100) for the left stick.</summary>
+    public double[] LeftStickCurve { get; set; } = new double[11] { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+
+    /// <summary>11 points defining the response curve (0-100) for the right stick.</summary>
+    public double[] RightStickCurve { get; set; } = new double[11] { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
 
     public KeyBinding? GetBinding(ControllerInput input) =>
         Bindings.TryGetValue(input, out KeyBinding? binding) ? binding : null;

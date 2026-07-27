@@ -153,8 +153,8 @@ public sealed class ProfileStore
     public (bool enabled, double seconds) LoadAntiGhostSettings()
     {
         StateDto? state = ReadState();
-        bool enabled = state?.AntiGhostEnabled ?? true;
-        double seconds = state?.AntiGhostSeconds ?? 10.0;
+        bool enabled = state?.AntiGhostEnabled ?? false;
+        double seconds = state?.AntiGhostSeconds ?? 2.5;
         return (enabled, seconds);
     }
 
@@ -165,6 +165,26 @@ public sealed class ProfileStore
             StateDto state = ReadState() ?? new StateDto();
             state.AntiGhostEnabled = enabled;
             state.AntiGhostSeconds = seconds;
+            File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(state, JsonOptions));
+        }
+        catch
+        {
+            // non-critical
+        }
+    }
+
+    public int LoadReportRate()
+    {
+        StateDto? state = ReadState();
+        return state?.ReportRate ?? 500;
+    }
+
+    public void SaveReportRate(int reportRate)
+    {
+        try
+        {
+            StateDto state = ReadState() ?? new StateDto();
+            state.ReportRate = reportRate;
             File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(state, JsonOptions));
         }
         catch
@@ -201,7 +221,10 @@ public sealed class ProfileStore
         Deadzone = profile.Deadzone,
         DigitalThreshold = profile.DigitalThreshold,
         BlockMappedKeys = profile.BlockMappedKeys,
+        UseRadialDeadzone = profile.UseRadialDeadzone,
         Locked = profile.Locked,
+        LeftStickCurve = profile.LeftStickCurve,
+        RightStickCurve = profile.RightStickCurve,
         Bindings = profile.Bindings
             .Where(kv => kv.Value is not null)
             .Select(kv => new BindingDto
@@ -222,8 +245,12 @@ public sealed class ProfileStore
             Deadzone = dto.Deadzone,
             DigitalThreshold = dto.DigitalThreshold <= 0 ? 0.50 : dto.DigitalThreshold,
             BlockMappedKeys = dto.BlockMappedKeys,
+            UseRadialDeadzone = dto.UseRadialDeadzone,
             Locked = dto.Locked,
         };
+        
+        if (dto.LeftStickCurve != null && dto.LeftStickCurve.Length == 11) profile.LeftStickCurve = dto.LeftStickCurve;
+        if (dto.RightStickCurve != null && dto.RightStickCurve.Length == 11) profile.RightStickCurve = dto.RightStickCurve;
 
         foreach (BindingDto b in dto.Bindings)
         {
@@ -243,7 +270,10 @@ public sealed class ProfileStore
         public double Deadzone { get; set; } = 0.05;
         public double DigitalThreshold { get; set; } = 0.50;
         public bool BlockMappedKeys { get; set; } = true;
+        public bool UseRadialDeadzone { get; set; } = true;
         public bool Locked { get; set; }
+        public double[]? LeftStickCurve { get; set; }
+        public double[]? RightStickCurve { get; set; }
     }
 
     private sealed class BindingDto
@@ -260,5 +290,6 @@ public sealed class ProfileStore
         public Dictionary<string, int[]>? Hotkeys { get; set; }
         public bool? AntiGhostEnabled { get; set; }
         public double? AntiGhostSeconds { get; set; }
+        public int? ReportRate { get; set; }
     }
 }
