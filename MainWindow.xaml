@@ -5,8 +5,10 @@
         xmlns:tb="clr-namespace:H.NotifyIcon;assembly=H.NotifyIcon.Wpf"
         xmlns:conv="clr-namespace:XinputG84HE.Converters"
         xmlns:models="clr-namespace:XinputG84HE.Models"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="EPOMAKER G84HE Xbox Emulation"
-        Height="1080" Width="1600" MinHeight="840" MinWidth="1000"
+        Icon="pack://application:,,,/Assets/icon.ico"
+        Height="1130" Width="1600" MinHeight="840" MinWidth="1000"
         WindowBackdropType="Mica"
         ExtendsContentIntoTitleBar="True"
         Closing="OnWindowClosing">
@@ -24,6 +26,42 @@
         <conv:LabelToVisibilityConverter x:Key="LabelVisibility" />
         <conv:BoundPressedMultiConverter x:Key="DigitalBrush" UnboundBrush="#221A1D24" BoundIdleBrush="#2500C896" PressedBrush="#00C896" />
         <conv:ZeroCountToVisibilityConverter x:Key="ZeroCountVisibility" />
+        <conv:KeyActuationBrushConverter x:Key="KeyActuationBrush" />
+
+        <Style x:Key="KeyboardKeyStyle" TargetType="Button">
+            <Setter Property="BorderBrush" Value="#35404D" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="5" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#A5B5C4" />
+                </Trigger>
+                <DataTrigger Binding="{Binding IsMapped}" Value="True">
+                    <Setter Property="BorderBrush" Value="#66F5CB" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="#79B8FF" />
+                    <Setter Property="BorderThickness" Value="3" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding DataContext.IsCurrentPresetLocked, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True">
+                    <Setter Property="IsEnabled" Value="False" />
+                    <Setter Property="Cursor" Value="Arrow" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
 
         <!-- Hotspot Style for Controller Buttons -->
         <Style x:Key="HotspotStyle" TargetType="ui:Button">
@@ -177,7 +215,7 @@
 
         <!-- ===================== Sidebar ===================== -->
         <Border Grid.Column="0" Background="#0D111A" BorderBrush="#22FFFFFF" BorderThickness="0,0,1,0" Padding="18,36,18,20">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer VerticalScrollBarVisibility="Hidden">
                 <StackPanel>
                     <Grid Margin="0,0,0,18">
                         <Grid.ColumnDefinitions>
@@ -188,8 +226,6 @@
                             <TextBlock Text="EPOMAKER G84HE" FontSize="18" FontWeight="Bold" Foreground="White" />
                             <TextBlock Text="Xbox Emulation" FontSize="12" Foreground="#00C896" FontWeight="SemiBold" />
                         </StackPanel>
-                        <Button Grid.Column="1" Content="Exit" Click="OnExitClick" VerticalAlignment="Top"
-                                Style="{StaticResource GlassButton}" Padding="10,4" Foreground="#FF6B6B" />
                     </Grid>
 
                     <!-- Connection status -->
@@ -202,6 +238,11 @@
                                 </StackPanel>
                                 <Button Content="?" Command="{Binding ToggleAnalogHelpCommand}" HorizontalAlignment="Right" Padding="6,1" FontSize="11" FontWeight="Bold" Style="{StaticResource GlassButton}" />
                             </Grid>
+                            <Border Background="#2200C896" BorderBrush="#5500C896" BorderThickness="1" CornerRadius="5"
+                                    Padding="7,2" Margin="16,6,0,0" HorizontalAlignment="Left"
+                                    Visibility="{Binding IsKeyboardConnected, Converter={StaticResource BindingVisibility}}">
+                                <TextBlock Text="{Binding ConnectionTransport}" Foreground="#00C896" FontSize="10" FontWeight="SemiBold" />
+                            </Border>
                             <StackPanel Margin="0,8,0,0" Visibility="{Binding IsAnalogHelpVisible, Converter={StaticResource BindingVisibility}}">
                                 <Button Content="Force Analog Input" Command="{Binding InitializeAnalogModeCommand}" Style="{StaticResource GlassButton}" Padding="0,6" HorizontalContentAlignment="Center" Margin="0,0,0,6" Foreground="#00C896" />
                                 <TextBlock Text="Runs automatically on startup and when emulation turns on - use this if the keyboard ever comes up silent." FontSize="10" Opacity="0.6" TextWrapping="Wrap" Foreground="White" />
@@ -301,7 +342,11 @@
                                                      Visibility="{Binding IsEditingName, Converter={StaticResource BindingVisibility}}" />
                                         </Grid>
 
-                                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Grid.Row="1" Text="Always saved" FontSize="10" Foreground="#00C896"
+                                                   ToolTip="Permanent working preset. Selected by mouse; preset hotkeys skip this slot."
+                                                   Visibility="{Binding IsAutosave, Converter={StaticResource BindingVisibility}}" />
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                                                    Visibility="{Binding IsAutosave, Converter={StaticResource InvertedVisibility}}">
                                             <Button Content="&#9998;" ToolTip="Rename" Command="{Binding BeginRenameCommand}" Style="{StaticResource GlassButton}"
                                                     FontSize="10" Padding="4,1" Margin="0,0,3,0" />
                                             <Button ToolTip="Lock/unlock" Command="{Binding ToggleLockCommand}"
@@ -325,6 +370,36 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <!-- SnapStick+ -->
+                    <Border Style="{StaticResource GlassPanel}" BorderBrush="#5500C896" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Background="#2200C896" CornerRadius="5" Padding="8,4" HorizontalAlignment="Left">
+                                    <TextBlock Text="&#x26A1; SnapStick+" Foreground="#00C896" FontSize="12" FontWeight="Bold" />
+                                </Border>
+                                <ToggleButton Grid.Column="1" IsChecked="{Binding SnapStickEnabled}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                              ToolTip="Latest press wins on opposing stick directions. Unlock the preset to change this."
+                                              AutomationProperties.Name="SnapStick+">
+                                    <ToggleButton.Style>
+                                        <Style TargetType="ToggleButton" BasedOn="{StaticResource SwitchStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrentPresetLocked}" Value="True">
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ToggleButton.Style>
+                                </ToggleButton>
+                            </Grid>
+                            <TextBlock Text="Latest opposing press wins on both sticks. Keeps analog depth; releasing it restores the held direction."
+                                       FontSize="10" Opacity="0.6" Foreground="White" TextWrapping="Wrap" Margin="0,7,0,0" />
+                        </StackPanel>
+                    </Border>
 
                     <!-- Tuning -->
                     <Border Style="{StaticResource GlassPanel}" Margin="0,0,0,14">
@@ -501,30 +576,20 @@
                         </StackPanel>
                     </Expander>
 
-                    <!-- Live key actuation -->
-                    <TextBlock Text="LIVE KEY ACTUATION" FontSize="10" FontWeight="Bold" Foreground="#00C896" Margin="0,0,0,6" />
-                    <ItemsControl ItemsSource="{Binding ActiveKeyRows}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Vertical" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,0,5" Padding="8,5" CornerRadius="6" Background="#121620" BorderBrush="#22FFFFFF" BorderThickness="1">
-                                    <StackPanel>
-                                        <Grid>
-                                            <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Left" />
-                                            <TextBlock Text="{Binding Percent, StringFormat={}{0:0}%}" FontSize="10" Foreground="#00C896" FontWeight="Bold" HorizontalAlignment="Right" />
-                                        </Grid>
-                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Percent, Mode=OneWay}" Height="5" Margin="0,3,0,0" Foreground="#00C896" Background="#1AFFFFFF" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Text="(no keys currently active)" FontSize="10" Opacity="0.5" Foreground="White" HorizontalAlignment="Center" Margin="0,4,0,0"
-                               Visibility="{Binding ActiveKeyRows.Count, Converter={StaticResource ZeroCountVisibility}}" />
+                    <!-- Diagnostics -->
+                    <Expander Header="Diagnostics" IsExpanded="{Binding IsDiagnosticsExpanded}" Margin="0,0,0,14" Foreground="White">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="{Binding DiagnosticsText}" FontSize="11" Foreground="White" TextWrapping="Wrap" />
+                            <TextBlock Text="Output updates measure the app loop, not game latency. Steady key holds may produce fewer HID reports."
+                                       FontSize="10" Opacity="0.6" Foreground="White" TextWrapping="Wrap" Margin="0,8,0,8" />
+                            <TextBox Text="{Binding DiagnosticLog, Mode=OneWay}" IsReadOnly="True" Height="130"
+                                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#121620"
+                                     Foreground="White" BorderBrush="#22FFFFFF" FontSize="10" Padding="6" />
+                            <Button Content="Copy diagnostics" Command="{Binding CopyDiagnosticsCommand}"
+                                    Style="{StaticResource GlassButton}" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Expander>
+
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -534,14 +599,24 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="44" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="5*" />
+                <RowDefinition Height="3.25*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <ui:TitleBar Grid.Row="0" Title="EPOMAKER G84HE Xbox Emulation" ShowMaximize="True" ShowMinimize="True" />
+            <Button Grid.Row="0" Content="Exit" Click="OnExitClick" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Margin="0,0,144,0" Style="{StaticResource GlassButton}" Padding="10,4" Foreground="#FF6B6B"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True" />
 
             <Border Grid.Row="1" Margin="24,10,24,0" Padding="14,10" CornerRadius="10" Background="#2500C896" BorderBrush="#00C896" BorderThickness="1"
                     Visibility="{Binding IsBinding, Converter={StaticResource BindingVisibility}}">
-                <TextBlock Text="{Binding BindingStatusText}" FontSize="13" FontWeight="SemiBold" Foreground="White" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Cancel" Command="{Binding CancelBindCommand}"
+                            Style="{StaticResource GlassButton}" Padding="8,3" Margin="12,0,0,0" />
+                    <TextBlock Text="{Binding BindingStatusText}" FontSize="13" FontWeight="SemiBold" Foreground="White"
+                               TextWrapping="Wrap" VerticalAlignment="Center" />
+                </DockPanel>
             </Border>
 
             <Border Grid.Row="1" Margin="24,10,24,0" Padding="14,10" CornerRadius="10" Background="#253B82F6" BorderBrush="#3B82F6" BorderThickness="1"
@@ -818,8 +893,46 @@
                 </Canvas>
             </Viewbox>
 
-            <TextBlock Grid.Row="2" Text="App Version 1.11 - Designed by Claude Sonnet 5 and Gemini 3.6 Flash"
-                       FontSize="11" Opacity="0.4"
+            <!-- Physical keyboard actuation, directly below the controller. -->
+            <Viewbox Grid.Row="3" Stretch="Uniform" Margin="24,0,24,10" MouseRightButtonDown="OnCanvasRightClick">
+                <Border Width="780" Padding="17" CornerRadius="12" Background="#0E121C" BorderBrush="#2AFFFFFF" BorderThickness="1">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <TextBlock Text="LIVE KEY ACTUATION" FontSize="10" FontWeight="Bold" Foreground="#00C896" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding KeyboardKeys}" Width="{x:Static models:KeyboardLayout.Width}" Height="{x:Static models:KeyboardLayout.Height}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Canvas.Left" Value="{Binding Key.X}" />
+                                    <Setter Property="Canvas.Top" Value="{Binding Key.Y}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="{Binding Key.Width}" Height="{Binding Key.Height}" Style="{StaticResource KeyboardKeyStyle}"
+                                            Command="{Binding DataContext.SelectKeyboardKeyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Background="{Binding Percent, Converter={StaticResource KeyActuationBrush}}"
+                                            ToolTip="{Binding ActuationText}" ToolTipService.ShowOnDisabled="True"
+                                            AutomationProperties.Name="{Binding ActuationText}">
+                                        <TextBlock Text="{Binding Key.Label}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{Binding Percent, Converter={StaticResource KeyActuationBrush}, ConverterParameter=Label}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Viewbox>
+
+            <TextBlock Grid.Row="4" Text="App Version 1.12 Designed by Claude Sonnet 5, Gemini 3.6 Flash and ChatGPT 6 Astra"
+                       FontSize="11" Opacity="0.4" TextWrapping="Wrap" TextAlignment="Center"
                        HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8"
                        IsHitTestVisible="False" />
         </Grid>
@@ -1030,6 +1143,7 @@
 
         <!-- ===================== Tray icon ===================== -->
         <tb:TaskbarIcon x:Name="TrayIcon"
+                         IconSource="pack://application:,,,/Assets/icon.ico"
                          ToolTipText="EPOMAKER G84HE Xbox Emulation"
                          MenuActivation="LeftOrRightClick"
                          TrayLeftMouseUp="OnTrayLeftClick">

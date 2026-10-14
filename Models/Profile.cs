@@ -3,9 +3,9 @@ namespace XinputG84HE.Models;
 /// <summary>
 /// A physical keyboard key, as learned during bind mode: the raw vendor key
 /// ID (used to read actuation depth from the analog HID interface) paired
-/// with its standard Win32 virtual-key code (used by the keyboard hook to
-/// block it). Both are captured from the same key press at bind time, since
-/// there's no static table mapping one to the other.
+/// with its Win32 virtual-key code (used by the keyboard hook to block it).
+/// Physical capture learns both; virtual-key clicks resolve the PC scan code
+/// through the active Windows keyboard layout. Firmware-only Fn has no VK.
 /// </summary>
 public sealed record KeyBinding(ushort RawKeyId, int VirtualKey, string DisplayName);
 
@@ -16,6 +16,9 @@ public sealed record KeyBinding(ushort RawKeyId, int VirtualKey, string DisplayN
 public sealed class Profile
 {
     public string Name { get; set; } = "Default";
+
+    /// <summary>Permanent working slot, stored separately from named presets.</summary>
+    public bool IsAutosave { get; init; }
 
     /// <summary>Controller input -> bound key. Absent/null entries are unbound.</summary>
     public Dictionary<ControllerInput, KeyBinding?> Bindings { get; set; } = new();
@@ -31,6 +34,9 @@ public sealed class Profile
 
     /// <summary>When true, use radial/circular deadzone for joysticks rather than axial (square). False by default.</summary>
     public bool UseRadialDeadzone { get; set; } = false;
+
+    /// <summary>Give the latest physical press priority on opposing stick directions.</summary>
+    public bool SnapStickEnabled { get; set; } = false;
 
     /// <summary>When true, this preset's bindings and tuning can't be changed until unlocked.</summary>
     public bool Locked { get; set; }

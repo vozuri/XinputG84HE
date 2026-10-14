@@ -9,7 +9,7 @@ namespace XinputG84HE.Services;
 /// whichever is actually live), decodes raw actuation reports, and can send
 /// the "enable simulation mode" command that turns analog reporting on.
 ///
-/// Device: VID 0x3151, PID 0x5038 (wired) or 0x5030 (2.4GHz dongle).
+/// Device: VID 0x3151, PID 0x5030 (wired) or 0x5038 (2.4GHz dongle).
 /// Analog interface: usage page 0xFFFF, usage 0x01, 32-byte reports
 ///   [reportId=0x05][0x1B][value:u16 LE][keyId:u16 LE][pad...]
 /// Control interface (simulation mode toggle): usage page 0xFFFF, usage 0x02,
@@ -30,7 +30,7 @@ public sealed class HidDeviceService
     private const ushort NoiseFloor = 3;
 
     private const ushort VendorId = 0x3151;
-    private static readonly ushort[] ProductIds = { 0x5038, 0x5030 };
+    private static readonly ushort[] ProductIds = { DeviceConnection.WiredProductId, DeviceConnection.WirelessProductId };
     private const ushort AnalogUsagePage = 0xFFFF;
     private const ushort AnalogUsage = 0x01;
     private const ushort ControlUsage = 0x02;
@@ -40,6 +40,9 @@ public sealed class HidDeviceService
     private readonly Dictionary<ushort, (ushort value, DateTime since)> _valueTracking = new();
     private readonly object _lock = new();
     private readonly HashSet<string> _activeDevicePaths = new();
+    private readonly SnapStickState _snapStick = new();
+    private long _reportCount;
+    private long _lastReportTimestamp;
 
     // If a key's raw actuation value stays bit-for-bit identical (and isn't
     // fully bottomed out) for longer than AntiGhostSeconds, treat it as a
@@ -61,6 +64,33 @@ public sealed class HidDeviceService
     public bool IsConnected
     {
         get { lock (_lock) { return _activeDevicePaths.Count > 0; } }
+    }
+
+    public string ConnectionDescription
+    {
+        get { lock (_lock) { return DeviceConnection.Describe(_activeDevicePaths); } }
+    }
+
+    public (long reports, double lastReportAgeSeconds, int interfaces, int activeKeys) GetDiagnostics()
+    {
+        lock (_lock)
+        {
+            double age = _lastReportTimestamp == 0 ? double.PositiveInfinity
+                : (System.Diagnostics.Stopwatch.GetTimestamp() - _lastReportTimestamp)
+                    / (double)System.Diagnostics.Stopwatch.Frequency;
+            return (_reportCount, age, _activeDevicePaths.Count, _activeKeys.Count);
+        }
+    }
+
+    /// <summary>Read both directions and their press order atomically, retaining analog depth.</summary>
+    public (double positive, double negative) GetSnapStickPair(ushort? positiveId, ushort? negativeId)
+    {
+        lock (_lock)
+        {
+            double positive = positiveId.HasValue ? Math.Clamp(GetRawLocked(positiveId.Value) / (double)MaxRawTravel, 0, 1) : 0;
+            double negative = negativeId.HasValue ? Math.Clamp(GetRawLocked(negativeId.Value) / (double)MaxRawTravel, 0, 1) : 0;
+            return _snapStick.Resolve(positiveId, positive, negativeId, negative);
+        }
     }
 
     public void Start()
@@ -257,6 +287,9 @@ public sealed class HidDeviceService
 
                 lock (_lock)
                 {
+                    _snapStick.Update(keyId, value > NoiseFloor);
+                    _reportCount++;
+                    _lastReportTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
                     if (value <= NoiseFloor)
                     {
                         _activeKeys.Remove(keyId);
@@ -290,6 +323,7 @@ public sealed class HidDeviceService
                 {
                     _activeKeys.Clear();
                     _valueTracking.Clear();
+                    _snapStick.Clear();
                 }
             }
 

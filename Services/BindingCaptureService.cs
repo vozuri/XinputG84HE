@@ -4,9 +4,7 @@ using XinputG84HE.Models;
 namespace XinputG84HE.Services;
 
 /// <summary>
-/// "Press a key to bind it" logic. There's no static table mapping the
-/// keyboard's vendor-specific analog key IDs to standard Win32 virtual-key
-/// codes, so instead we watch both event streams at once during a single
+/// Physical capture watches both event streams at once during a single
 /// capture window and pair whichever VK and whichever meaningfully-actuated
 /// key ID show up together - reliable as long as exactly one key is pressed,
 /// which is what the UI asks the user to do.
@@ -51,23 +49,25 @@ public sealed class BindingCaptureService
     /// </summary>
     public async Task<CaptureResult> CaptureNextKeyAsync(TimeSpan timeout)
     {
+        var pending = new TaskCompletionSource<CaptureResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_lock)
         {
+            Complete(CaptureResult.Cancelled);
             _seenVk = null;
             _seenKeyId = null;
-            _pending = new TaskCompletionSource<CaptureResult>();
+            _pending = pending;
         }
 
         using var cts = new CancellationTokenSource(timeout);
-        cts.Token.Register(() =>
+        using var registration = cts.Token.Register(() =>
         {
             lock (_lock)
             {
-                _pending?.TrySetResult(CaptureResult.Cancelled);
+                if (ReferenceEquals(_pending, pending)) Complete(CaptureResult.Cancelled);
             }
         });
 
-        return await _pending.Task;
+        return await pending.Task;
     }
 
     /// <summary>Cancels an in-progress capture without changing anything (e.g. right mouse button). No-op if nothing is being captured.</summary>
@@ -75,8 +75,29 @@ public sealed class BindingCaptureService
     {
         lock (_lock)
         {
-            _pending?.TrySetResult(CaptureResult.Cancelled);
+            Complete(CaptureResult.Cancelled);
         }
+    }
+
+    /// <summary>A virtual key click completes the same capture as a physical press.</summary>
+    public bool CompleteWithBinding(KeyBinding binding)
+    {
+        lock (_lock)
+        {
+            if (_pending is null) return false;
+            Complete(new CaptureResult(CaptureOutcome.Success, binding));
+            return true;
+        }
+    }
+
+    // Caller holds _lock. Clear before resuming UI code or accepting another capture.
+    private void Complete(CaptureResult result)
+    {
+        var pending = _pending;
+        _pending = null;
+        _seenVk = null;
+        _seenKeyId = null;
+        pending?.TrySetResult(result);
     }
 
     private void OnRawKeyDown(int vk)
@@ -90,7 +111,7 @@ public sealed class BindingCaptureService
 
             if (vk == VK_ESCAPE)
             {
-                _pending.TrySetResult(CaptureResult.Unbind);
+                Complete(CaptureResult.Unbind);
                 return;
             }
 
@@ -123,8 +144,7 @@ public sealed class BindingCaptureService
         if (_seenVk.HasValue && _seenKeyId.HasValue && _pending is not null)
         {
             var binding = new KeyBinding(_seenKeyId.Value, _seenVk.Value, VirtualKeyNames.Describe(_seenVk.Value));
-            _pending.TrySetResult(new CaptureResult(CaptureOutcome.Success, binding));
-            _pending = null;
+            Complete(new CaptureResult(CaptureOutcome.Success, binding));
         }
     }
 }

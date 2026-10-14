@@ -141,3 +141,39 @@ public sealed class ZeroCountToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>Reuse frozen brushes for the live keyboard: idle slate to signature green.</summary>
+public sealed class KeyActuationBrushConverter : IValueConverter
+{
+    private static readonly SolidColorBrush[] Fills = Enumerable.Range(0, 101).Select(percent =>
+    {
+        double depth = percent / 100.0;
+        var brush = new SolidColorBrush(Color.FromRgb(
+            (byte)Math.Round(23 * (1 - depth)),
+            (byte)Math.Round(29 + (200 - 29) * depth),
+            (byte)Math.Round(40 + (150 - 40) * depth)));
+        brush.Freeze();
+        return brush;
+    }).ToArray();
+
+    private static readonly Brush[] Labels = Fills.Select(fill =>
+    {
+        static double Linear(byte channel)
+        {
+            double value = channel / 255.0;
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+        Color c = fill.Color;
+        double luminance = 0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B);
+        return luminance > 0.179 ? Brushes.Black : Brushes.White;
+    }).ToArray();
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        int index = value is double percent && double.IsFinite(percent) ? (int)Math.Round(Math.Clamp(percent, 0, 100)) : 0;
+        return parameter as string == "Label" ? Labels[index] : Fills[index];
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

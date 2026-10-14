@@ -9,9 +9,6 @@ using XinputG84HE.Services;
 
 namespace XinputG84HE.ViewModels;
 
-/// <summary>One row in the live keypress overlay: a currently-active raw key and its actuation depth.</summary>
-public sealed record ActiveKeyRow(string Label, double Percent);
-
 public partial class MainViewModel : ObservableObject
 {
     private const string HotkeyToggle = "ToggleEmulation";
@@ -53,6 +50,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double digitalThresholdPercent = 50;
     [ObservableProperty] private bool blockMappedKeys = true;
     [ObservableProperty] private bool useRadialDeadzone = false;
+    [ObservableProperty] private bool snapStickEnabled = false;
     [ObservableProperty] private bool antiGhostInputEnabled = false;
     [ObservableProperty] private double antiGhostInputSeconds = 2.5;
     [ObservableProperty] private int emulationReportRate = 500;
@@ -77,7 +75,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double leftTriggerFill;
     [ObservableProperty] private double rightTriggerFill;
     [ObservableProperty] private IReadOnlyCollection<ControllerInput> pressedInputs = Array.Empty<ControllerInput>();
-    [ObservableProperty] private IReadOnlyList<ActiveKeyRow> activeKeyRows = Array.Empty<ActiveKeyRow>();
+    public IReadOnlyList<KeyboardKeyViewModel> KeyboardKeys { get; } =
+        KeyboardLayout.Keys.Select(key => new KeyboardKeyViewModel(key)).ToArray();
 
     private readonly DispatcherTimer _liveViewTimer;
 
@@ -120,9 +119,13 @@ public partial class MainViewModel : ObservableObject
         _bindingCapture = new BindingCaptureService(_hook, _hid);
         _profileStore = new ProfileStore();
 
-        _hid.ConnectionChanged += connected => _dispatcher.Invoke(() => IsKeyboardConnected = connected);
-        _hid.Log += msg => _dispatcher.Invoke(() => StatusLog = msg);
-        _gamepad.Log += msg => _dispatcher.Invoke(() => StatusLog = msg);
+        _hid.ConnectionChanged += connected => _dispatcher.Invoke(() =>
+        {
+            IsKeyboardConnected = connected;
+            ConnectionTransport = _hid.ConnectionDescription;
+        });
+        _hid.Log += msg => _dispatcher.Invoke(() => RecordDiagnosticMessage(msg));
+        _gamepad.Log += msg => _dispatcher.Invoke(() => RecordDiagnosticMessage(msg));
         _hook.HotkeyPressed += name => _dispatcher.Invoke(() => OnHotkeyPressed(name));
 
         _profile = _profileStore.LoadLastOrDefault();
@@ -248,24 +251,8 @@ public partial class MainViewModel : ObservableObject
 
     private void CyclePreset(int direction)
     {
-        if (PresetTiles.Count == 0)
-        {
-            return;
-        }
-
-        int currentIndex = 0;
-        for (int i = 0; i < PresetTiles.Count; i++)
-        {
-            if (PresetTiles[i].Name == _profile.Name)
-            {
-                currentIndex = i;
-                break;
-            }
-        }
-
-        int count = PresetTiles.Count;
-        int nextIndex = ((currentIndex + direction) % count + count) % count;
-        LoadPreset(PresetTiles[nextIndex].Name);
+        string? next = _profileStore.GetAdjacentPresetName(_profile.IsAutosave ? null : _profile.Name, direction);
+        if (next is not null) LoadPreset(next);
     }
 
     public event Action? OnCurveEditorRedrawNeeded;
@@ -361,6 +348,7 @@ public partial class MainViewModel : ObservableObject
 
     private void BeginCaptureHotkey(string name, Action<string> setText)
     {
+        CancelBind();
         IsCapturingHotkey = true;
         setText("Press a key combo...");
 
@@ -383,77 +371,6 @@ public partial class MainViewModel : ObservableObject
     private void SavePreset() => _profileStore.Save(_profile);
 
     [RelayCommand]
-    private void CancelBind() => _bindingCapture.CancelCapture();
-
-    [RelayCommand]
-    private async Task StartBindAsync(ControllerInput input)
-    {
-        if (IsBinding)
-        {
-            return;
-        }
-
-        if (_profile.Locked)
-        {
-            BindingStatusText = "This preset is locked - unlock it first to change bindings.";
-            return;
-        }
-
-        IsBinding = true;
-        BindingStatusText = $"Press a key for {ControllerInputInfo.ShortLabel(input)}... (Esc to unbind, right-click to cancel)";
-
-        CaptureResult result = await _bindingCapture.CaptureNextKeyAsync(TimeSpan.FromSeconds(6));
-
-        switch (result.Outcome)
-        {
-            case CaptureOutcome.Success:
-                _profile.Bindings[input] = result.Binding;
-                _profileStore.Save(_profile);
-                RefreshLabel(input);
-                BindingStatusText = $"{ControllerInputInfo.ShortLabel(input)} bound to {result.Binding!.DisplayName}.";
-                if (IsEmulationRunning)
-                {
-                    RefreshBlockedKeys();
-                }
-                break;
-
-            case CaptureOutcome.Unbind:
-                _profile.Bindings[input] = null;
-                _profileStore.Save(_profile);
-                RefreshLabel(input);
-                BindingStatusText = $"{ControllerInputInfo.ShortLabel(input)} unbound.";
-                if (IsEmulationRunning)
-                {
-                    RefreshBlockedKeys();
-                }
-                break;
-
-            case CaptureOutcome.Cancelled:
-                BindingStatusText = "Cancelled - no changes made.";
-                break;
-        }
-
-        IsBinding = false;
-    }
-
-    [RelayCommand]
-    private void Unbind(ControllerInput input)
-    {
-        if (_profile.Locked)
-        {
-            return;
-        }
-
-        _profile.Bindings[input] = null;
-        _profileStore.Save(_profile);
-        RefreshLabel(input);
-        if (IsEmulationRunning)
-        {
-            RefreshBlockedKeys();
-        }
-    }
-
-    [RelayCommand]
     private void NewPreset()
     {
         string name = GenerateUniqueName("New Preset");
@@ -465,6 +382,7 @@ public partial class MainViewModel : ObservableObject
             DigitalThreshold = _profile.DigitalThreshold,
             BlockMappedKeys = _profile.BlockMappedKeys,
             UseRadialDeadzone = _profile.UseRadialDeadzone,
+            SnapStickEnabled = _profile.SnapStickEnabled,
         };
         _profileStore.Save(fresh);
         RefreshPresetTiles();
@@ -543,6 +461,20 @@ public partial class MainViewModel : ObservableObject
         _profileStore.Save(_profile);
     }
 
+    partial void OnSnapStickEnabledChanged(bool value)
+    {
+        if (_suppressTuningSave) return;
+        if (_profile.Locked)
+        {
+            _suppressTuningSave = true;
+            SnapStickEnabled = _profile.SnapStickEnabled;
+            _suppressTuningSave = false;
+            return;
+        }
+        _profile.SnapStickEnabled = value;
+        _profileStore.Save(_profile);
+    }
+
     partial void OnAntiGhostInputEnabledChanged(bool value)
     {
         if (_suppressTuningSave)
@@ -575,21 +507,23 @@ public partial class MainViewModel : ObservableObject
 
     // ---- Preset tile callbacks ----
 
-    private void OnTileSelect(PresetTileViewModel tile) => LoadPreset(tile.Name);
+    private void OnTileSelect(PresetTileViewModel tile) => LoadPreset(tile.Name, tile.IsAutosave);
 
     private void OnTileToggleLock(PresetTileViewModel tile)
     {
-        Profile? target = tile.Name == _profile.Name ? _profile : _profileStore.Load(tile.Name);
+        if (tile.IsAutosave) return;
+        Profile? target = IsCurrentTile(tile) ? _profile : _profileStore.Load(tile.Name);
         if (target is null)
         {
             return;
         }
 
+        if (ReferenceEquals(target, _profile)) CancelBind();
         target.Locked = !target.Locked;
         _profileStore.Save(target);
         tile.IsLocked = target.Locked;
 
-        if (target.Name == _profile.Name)
+        if (ReferenceEquals(target, _profile))
         {
             IsCurrentPresetLocked = _profile.Locked;
         }
@@ -597,7 +531,7 @@ public partial class MainViewModel : ObservableObject
 
     private void OnTileDelete(PresetTileViewModel tile)
     {
-        if (PresetTiles.Count <= 1)
+        if (tile.IsAutosave || PresetTiles.Count <= 1)
         {
             return;
         }
@@ -606,28 +540,20 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        bool wasCurrent = tile.Name == _profile.Name;
+        bool wasCurrent = IsCurrentTile(tile);
         _profileStore.Delete(tile.Name);
+        if (wasCurrent) LoadPreset(ProfileStore.AutosaveName, isAutosave: true);
         RefreshPresetTiles();
-
-        if (wasCurrent)
-        {
-            string? next = PresetTiles.FirstOrDefault()?.Name;
-            if (next is not null)
-            {
-                LoadPreset(next);
-            }
-        }
     }
 
     private void OnTileRename(PresetTileViewModel tile, string newName)
     {
-        if (PresetTiles.Any(t => t != tile && string.Equals(t.Name, newName, StringComparison.OrdinalIgnoreCase)))
+        if (tile.IsAutosave || tile.IsLocked || PresetTiles.Any(t => t != tile && string.Equals(t.Name, newName, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        bool wasCurrent = tile.Name == _profile.Name;
+        bool wasCurrent = IsCurrentTile(tile);
         _profileStore.Rename(tile.Name, newName);
         tile.Name = newName;
 
@@ -652,16 +578,20 @@ public partial class MainViewModel : ObservableObject
         return name;
     }
 
-    private void LoadPreset(string name)
+    private bool IsCurrentTile(PresetTileViewModel tile) =>
+        tile.IsAutosave == _profile.IsAutosave && tile.Name == _profile.Name;
+
+    private void LoadPreset(string name, bool isAutosave = false)
     {
-        Profile? loaded = _profileStore.Load(name);
+        Profile? loaded = isAutosave ? _profileStore.LoadAutosave() : _profileStore.Load(name);
         if (loaded is null)
         {
             return;
         }
 
+        CancelBind();
         _profile = loaded;
-        _profileStore.RememberLastActive(name);
+        _profileStore.RememberLastActive(_profile.Name, _profile.IsAutosave);
         ApplyProfileToUiState();
         RefreshAllLabels();
         UpdateTileSelection();
@@ -682,25 +612,31 @@ public partial class MainViewModel : ObservableObject
         DigitalThresholdPercent = _profile.DigitalThreshold * 100.0;
         BlockMappedKeys = _profile.BlockMappedKeys;
         UseRadialDeadzone = _profile.UseRadialDeadzone;
+        SnapStickEnabled = _profile.SnapStickEnabled;
         _suppressTuningSave = false;
     }
 
     private void RefreshPresetTiles()
     {
         PresetTiles.Clear();
+        PresetTiles.Add(new PresetTileViewModel(ProfileStore.AutosaveName, false,
+            OnTileSelect, OnTileToggleLock, OnTileDelete, OnTileRename, isAutosave: true)
+        {
+            IsSelected = _profile.IsAutosave,
+        });
 
         List<string> names = _profileStore.ListPresetNames();
-        if (!names.Contains(_profile.Name))
+        if (!_profile.IsAutosave && !names.Contains(_profile.Name))
         {
             names.Add(_profile.Name);
         }
 
         foreach (string name in names)
         {
-            bool locked = name == _profile.Name ? _profile.Locked : (_profileStore.Load(name)?.Locked ?? false);
+            bool locked = !_profile.IsAutosave && name == _profile.Name ? _profile.Locked : (_profileStore.Load(name)?.Locked ?? false);
             var tile = new PresetTileViewModel(name, locked, OnTileSelect, OnTileToggleLock, OnTileDelete, OnTileRename)
             {
-                IsSelected = name == _profile.Name,
+                IsSelected = !_profile.IsAutosave && name == _profile.Name,
             };
             PresetTiles.Add(tile);
         }
@@ -710,8 +646,8 @@ public partial class MainViewModel : ObservableObject
     {
         foreach (PresetTileViewModel tile in PresetTiles)
         {
-            tile.IsSelected = tile.Name == _profile.Name;
-            tile.IsLocked = tile.Name == _profile.Name ? _profile.Locked : tile.IsLocked;
+            tile.IsSelected = IsCurrentTile(tile);
+            tile.IsLocked = tile.IsSelected ? _profile.Locked : tile.IsLocked;
         }
     }
 
@@ -720,7 +656,7 @@ public partial class MainViewModel : ObservableObject
         _hook.BlockedVirtualKeys.Clear();
         foreach (KeyBinding? binding in _profile.Bindings.Values)
         {
-            if (binding is not null)
+            if (binding is not null && binding.VirtualKey != 0)
             {
                 _hook.BlockedVirtualKeys.Add(binding.VirtualKey);
             }
@@ -729,6 +665,7 @@ public partial class MainViewModel : ObservableObject
 
     private void RefreshAllLabels()
     {
+        RefreshKeyboardMappings();
         foreach (ControllerInput input in Enum.GetValues<ControllerInput>())
         {
             RefreshLabel(input);
@@ -781,6 +718,7 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateLiveView()
     {
+        UpdateDiagnostics();
         // Continuously re-derive from source of truth rather than relying only
         // on one-off assignments at toggle/checkbox-change time - guarantees
         // the checkbox can never get out of sync with actual hook behavior.
@@ -789,7 +727,11 @@ public partial class MainViewModel : ObservableObject
         double leftX, leftY;
         double rightX, rightY;
 
-        if (_profile.UseRadialDeadzone)
+        if (_profile.SnapStickEnabled)
+        {
+            (leftX, leftY, rightX, rightY) = _gamepad.GetStickAxes(_profile);
+        }
+        else if (_profile.UseRadialDeadzone)
         {
             leftX = RawSignedAxis(ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
             leftY = RawSignedAxis(ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
@@ -924,16 +866,13 @@ public partial class MainViewModel : ObservableObject
             _keyRowTracking.Remove(keyId);
         }
 
-        // Simple, final safety net: whatever the tracked state is, never
-        // actually display a row that would round to "0%" - hide it instead
-        // of showing a dead 0% bar. It stays in _keyRowTracking internally
-        // (so decay/removal timing above is unaffected), it just doesn't
-        // reach the UI for the frame(s) where it'd read as 0.
-        ActiveKeyRows = _keyRowTracking.Values
-            .Where(v => Math.Round(v.displayPercent, MidpointRounding.AwayFromZero) >= 1)
-            .Select(v => new ActiveKeyRow(v.label, v.displayPercent))
-            .OrderByDescending(r => r.Percent)
-            .ToList();
+        // Update the fixed physical keycaps by raw ID; repeated labels such as
+        // Shift, Ctrl and Alt must still light independently. Released keys reset.
+        foreach (KeyboardKeyViewModel key in KeyboardKeys)
+        {
+            key.Percent = _keyRowTracking.TryGetValue(key.Key.RawKeyId, out var tracked)
+                ? tracked.displayPercent : 0;
+        }
     }
 
     private string? FindBindingLabel(ushort keyId)
@@ -1008,6 +947,7 @@ public partial class MainViewModel : ObservableObject
 
     public void Shutdown()
     {
+        CancelBind();
         _liveViewTimer.Stop();
         _gamepad.Stop();
         _hook.Stop();

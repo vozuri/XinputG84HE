@@ -43,6 +43,8 @@ public sealed class GamepadOutputService : IDisposable
 
     public bool IsRunning => _controller is not null;
 
+    public OutputDiagnostics Diagnostics { get; } = new();
+
     public GamepadOutputService(HidDeviceService hid)
     {
         _hid = hid;
@@ -90,6 +92,7 @@ public sealed class GamepadOutputService : IDisposable
             return false;
         }
 
+        Diagnostics.BeginRun();
         _cts = new CancellationTokenSource();
         CancellationToken token = _cts.Token;
         new Thread(() => UpdateLoop(token)) { IsBackground = true, Name = "GamepadOutput" }.Start();
@@ -177,29 +180,7 @@ public sealed class GamepadOutputService : IDisposable
                     controller.SetButtonState(button, pressed);
                 }
 
-                double leftX, leftY;
-                double rightX, rightY;
-
-                if (profile.UseRadialDeadzone)
-                {
-                    leftX = RawSignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
-                    leftY = RawSignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
-                    ApplyCircularMapping(ref leftX, ref leftY);
-                    ApplyRadialDeadzone(ref leftX, ref leftY, profile.Deadzone, profile.LeftStickCurve);
-
-                    rightX = RawSignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
-                    rightY = RawSignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown);
-                    ApplyCircularMapping(ref rightX, ref rightY);
-                    ApplyRadialDeadzone(ref rightX, ref rightY, profile.Deadzone, profile.RightStickCurve);
-                }
-                else
-                {
-                    leftX = SignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft, profile.LeftStickCurve);
-                    leftY = SignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown, profile.LeftStickCurve);
-                    
-                    rightX = SignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft, profile.RightStickCurve);
-                    rightY = SignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown, profile.RightStickCurve);
-                }
+                var (leftX, leftY, rightX, rightY) = GetStickAxes(profile);
 
                 controller.SetAxisValue(Xbox360Axis.LeftThumbX, ToAxisShort(leftX));
                 controller.SetAxisValue(Xbox360Axis.LeftThumbY, ToAxisShort(leftY));
@@ -208,6 +189,7 @@ public sealed class GamepadOutputService : IDisposable
 
                 controller.SetSliderValue(Xbox360Slider.LeftTrigger, ToTriggerByte(DeadzonedValue(profile, ControllerInput.LeftTrigger)));
                 controller.SetSliderValue(Xbox360Slider.RightTrigger, ToTriggerByte(DeadzonedValue(profile, ControllerInput.RightTrigger)));
+                Diagnostics.RecordUpdate();
             }
             catch (Exception ex)
             {
@@ -216,8 +198,49 @@ public sealed class GamepadOutputService : IDisposable
         }
     }
 
+    /// <summary>Shared stick calculation for output and the SnapStick+ live preview.</summary>
+    public (double leftX, double leftY, double rightX, double rightY) GetStickAxes(Profile profile)
+    {
+        double leftX, leftY;
+        double rightX, rightY;
+
+        if (profile.UseRadialDeadzone)
+        {
+            leftX = RawSignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft);
+            leftY = RawSignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown);
+            ApplyCircularMapping(ref leftX, ref leftY);
+            ApplyRadialDeadzone(ref leftX, ref leftY, profile.Deadzone, profile.LeftStickCurve);
+
+            rightX = RawSignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft);
+            rightY = RawSignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown);
+            ApplyCircularMapping(ref rightX, ref rightY);
+            ApplyRadialDeadzone(ref rightX, ref rightY, profile.Deadzone, profile.RightStickCurve);
+        }
+        else
+        {
+            leftX = SignedAxis(profile, ControllerInput.LeftStickRight, ControllerInput.LeftStickLeft, profile.LeftStickCurve);
+            leftY = SignedAxis(profile, ControllerInput.LeftStickUp, ControllerInput.LeftStickDown, profile.LeftStickCurve);
+
+            rightX = SignedAxis(profile, ControllerInput.RightStickRight, ControllerInput.RightStickLeft, profile.RightStickCurve);
+            rightY = SignedAxis(profile, ControllerInput.RightStickUp, ControllerInput.RightStickDown, profile.RightStickCurve);
+        }
+
+        return (leftX, leftY, rightX, rightY);
+    }
+
     private double SignedAxis(Profile profile, ControllerInput positive, ControllerInput negative, double[] curve)
     {
+        if (profile.SnapStickEnabled)
+        {
+            var pair = _hid.GetSnapStickPair(profile.GetRawKeyId(positive), profile.GetRawKeyId(negative));
+            double value = pair.positive - pair.negative;
+            double magnitude = Math.Abs(value);
+            if (magnitude <= profile.Deadzone) return 0;
+            magnitude = (magnitude - profile.Deadzone) / (1.0 - profile.Deadzone);
+            if (curve != null) magnitude = EvaluateCurve(curve, magnitude);
+            return Math.Clamp(Math.Sign(value) * magnitude, -1.0, 1.0);
+        }
+
         double pos = DeadzonedValue(profile, positive);
         double neg = DeadzonedValue(profile, negative);
         if (curve != null)
@@ -230,6 +253,12 @@ public sealed class GamepadOutputService : IDisposable
 
     private double RawSignedAxis(Profile profile, ControllerInput positive, ControllerInput negative)
     {
+        if (profile.SnapStickEnabled)
+        {
+            var pair = _hid.GetSnapStickPair(profile.GetRawKeyId(positive), profile.GetRawKeyId(negative));
+            return pair.positive - pair.negative;
+        }
+
         double pos = RawValue(profile, positive);
         double neg = RawValue(profile, negative);
         return Math.Clamp(pos - neg, -1.0, 1.0);

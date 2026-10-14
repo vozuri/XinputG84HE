@@ -2,7 +2,7 @@
 
 A lightweight, open-source Windows utility designed specifically for the EPOMAKER G84HE. This software maps your keyboard and HID inputs to virtual XInput gamepad commands, allowing you to use your keyboard as a controller. 
 
-*Note: This project was 99% vibecoded by Claude Sonnet 5.*
+*Note: This project was 99% vibecoded by ChatGPT 6 Astra*
 
 ### The Wooting 80HE Killer
 
@@ -14,12 +14,15 @@ In my opinion, the only **main** feature advantage the Wooting 80HE held over th
 
 * Maps keyboard keys onto a virtual Xbox 360 controller.
 * Hotkey support for stopping emulation.
+* NEW SnapStick+: analog SOCD support
 * Preset support for different mappings (e.g., driving games: W and S for triggers; other configurations: W and S for thumbstick).
 * Anti Ghost Input option for when the keyboard may not update a key's switch status correctly.
 * Blocked mapped keys option to mute keyboard switches used for current controller emulation.
 * Deadzone customization.
 * Force analog override command if the keyboard isn't sending data correctly.
 * Live key actuation status (shows ghost inputs being nullified).
+* Custom response curves for joysticks with editor
+* Choose between square and circle deadzone
 
 ---
 

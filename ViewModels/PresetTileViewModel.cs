@@ -5,6 +5,7 @@ namespace XinputG84HE.ViewModels;
 
 public partial class PresetTileViewModel : ObservableObject
 {
+    public bool IsAutosave { get; }
     [ObservableProperty] private string name;
     [ObservableProperty] private bool isSelected;
     [ObservableProperty] private bool isLocked;
@@ -22,10 +23,12 @@ public partial class PresetTileViewModel : ObservableObject
         Action<PresetTileViewModel> onSelect,
         Action<PresetTileViewModel> onToggleLock,
         Action<PresetTileViewModel> onDelete,
-        Action<PresetTileViewModel, string> onRename)
+        Action<PresetTileViewModel, string> onRename,
+        bool isAutosave = false)
     {
         this.name = name;
-        this.isLocked = isLocked;
+        IsAutosave = isAutosave;
+        this.isLocked = !isAutosave && isLocked;
         _onSelect = onSelect;
         _onToggleLock = onToggleLock;
         _onDelete = onDelete;
@@ -36,15 +39,15 @@ public partial class PresetTileViewModel : ObservableObject
     private void Select() => _onSelect(this);
 
     [RelayCommand]
-    private void ToggleLock() => _onToggleLock(this);
+    private void ToggleLock() { if (!IsAutosave) _onToggleLock(this); }
 
     [RelayCommand]
-    private void Delete() => _onDelete(this);
+    private void Delete() { if (!IsAutosave) _onDelete(this); }
 
     [RelayCommand]
     private void BeginRename()
     {
-        if (IsLocked)
+        if (IsLocked || IsAutosave)
         {
             return;
         }
@@ -55,7 +58,7 @@ public partial class PresetTileViewModel : ObservableObject
     [RelayCommand]
     private void CommitRename()
     {
-        if (!IsEditingName)
+        if (!IsEditingName || IsAutosave)
         {
             return;
         }

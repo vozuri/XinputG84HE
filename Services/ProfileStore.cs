@@ -6,17 +6,20 @@ namespace XinputG84HE.Services;
 
 public sealed class ProfileStore
 {
+    public const string AutosaveName = "Autosave";
     private readonly string _presetsFolder;
     private readonly string _stateFilePath;
+    private readonly string _autosaveFilePath;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public ProfileStore()
+    public ProfileStore(string? root = null)
     {
-        string root = Path.Combine(
+        root ??= Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "XinputG84HE");
         _presetsFolder = Path.Combine(root, "Presets");
         _stateFilePath = Path.Combine(root, "state.json");
+        _autosaveFilePath = Path.Combine(root, "autosave.json");
         Directory.CreateDirectory(_presetsFolder);
     }
 
@@ -59,7 +62,37 @@ public sealed class ProfileStore
     {
         ProfileDto dto = ToDto(profile);
         string json = JsonSerializer.Serialize(dto, JsonOptions);
-        File.WriteAllText(PathFor(profile.Name), json);
+        if (profile.IsAutosave)
+        {
+            // Replace in one step so an interrupted write cannot truncate the slot.
+            string temporary = _autosaveFilePath + ".tmp";
+            File.WriteAllText(temporary, json);
+            File.Move(temporary, _autosaveFilePath, overwrite: true);
+        }
+        else File.WriteAllText(PathFor(profile.Name), json);
+    }
+
+    public Profile LoadAutosave()
+    {
+        ProfileDto? dto = null;
+        if (File.Exists(_autosaveFilePath))
+        {
+            try { dto = JsonSerializer.Deserialize<ProfileDto>(File.ReadAllText(_autosaveFilePath), JsonOptions); }
+            catch { /* A missing or unreadable working slot starts empty. */ }
+        }
+        var profile = FromDtoCore(dto ?? new ProfileDto { UseRadialDeadzone = false }, isAutosave: true);
+        if (dto is null) Save(profile);
+        return profile;
+    }
+
+    /// <summary>Only named presets participate in next/previous hotkeys.</summary>
+    public string? GetAdjacentPresetName(string? currentName, int direction)
+    {
+        var names = ListPresetNames();
+        if (names.Count == 0) return null;
+        int index = names.FindIndex(name => string.Equals(name, currentName, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return direction < 0 ? names[^1] : names[0];
+        return names[(index + (direction < 0 ? -1 : 1) + names.Count) % names.Count];
     }
 
     public void Delete(string name)
@@ -83,10 +116,13 @@ public sealed class ProfileStore
         Save(profile);
     }
 
-    /// <summary>Loads the last-active preset, or creates a fresh "Default" preset if none exist yet.</summary>
+    /// <summary>Preserves the last named preset or Autosave; new installations start in Autosave.</summary>
     public Profile LoadLastOrDefault()
     {
-        string? lastName = ReadState()?.LastActive;
+        var autosave = LoadAutosave();
+        var state = ReadState();
+        if (state?.LastActiveIsAutosave == true) return autosave;
+        string? lastName = state?.LastActive;
         if (lastName is not null)
         {
             Profile? loaded = Load(lastName);
@@ -106,17 +142,16 @@ public sealed class ProfileStore
             }
         }
 
-        var fresh = new Profile { Name = "Default" };
-        Save(fresh);
-        return fresh;
+        return autosave;
     }
 
-    public void RememberLastActive(string name)
+    public void RememberLastActive(string name, bool isAutosave = false)
     {
         try
         {
             StateDto state = ReadState() ?? new StateDto();
             state.LastActive = name;
+            state.LastActiveIsAutosave = isAutosave;
             File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(state, JsonOptions));
         }
         catch
@@ -222,6 +257,7 @@ public sealed class ProfileStore
         DigitalThreshold = profile.DigitalThreshold,
         BlockMappedKeys = profile.BlockMappedKeys,
         UseRadialDeadzone = profile.UseRadialDeadzone,
+        SnapStickEnabled = profile.SnapStickEnabled,
         Locked = profile.Locked,
         LeftStickCurve = profile.LeftStickCurve,
         RightStickCurve = profile.RightStickCurve,
@@ -237,16 +273,20 @@ public sealed class ProfileStore
             .ToList(),
     };
 
-    private static Profile FromDto(ProfileDto dto)
+    private static Profile FromDto(ProfileDto dto) => FromDtoCore(dto, false);
+
+    private static Profile FromDtoCore(ProfileDto dto, bool isAutosave)
     {
         var profile = new Profile
         {
-            Name = dto.Name,
+            Name = isAutosave ? AutosaveName : dto.Name,
+            IsAutosave = isAutosave,
             Deadzone = dto.Deadzone,
             DigitalThreshold = dto.DigitalThreshold <= 0 ? 0.50 : dto.DigitalThreshold,
             BlockMappedKeys = dto.BlockMappedKeys,
             UseRadialDeadzone = dto.UseRadialDeadzone,
-            Locked = dto.Locked,
+            SnapStickEnabled = dto.SnapStickEnabled,
+            Locked = !isAutosave && dto.Locked,
         };
         
         if (dto.LeftStickCurve != null && dto.LeftStickCurve.Length == 11) profile.LeftStickCurve = dto.LeftStickCurve;
@@ -271,6 +311,7 @@ public sealed class ProfileStore
         public double DigitalThreshold { get; set; } = 0.50;
         public bool BlockMappedKeys { get; set; } = true;
         public bool UseRadialDeadzone { get; set; } = true;
+        public bool SnapStickEnabled { get; set; }
         public bool Locked { get; set; }
         public double[]? LeftStickCurve { get; set; }
         public double[]? RightStickCurve { get; set; }
@@ -287,6 +328,7 @@ public sealed class ProfileStore
     private sealed class StateDto
     {
         public string? LastActive { get; set; }
+        public bool LastActiveIsAutosave { get; set; }
         public Dictionary<string, int[]>? Hotkeys { get; set; }
         public bool? AntiGhostEnabled { get; set; }
         public double? AntiGhostSeconds { get; set; }
